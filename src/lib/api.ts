@@ -41,6 +41,15 @@ export const createAppointment = async (data: any) => {
   return res.json();
 };
 
+export const deleteAppointment = async (id: string) => {
+  const res = await fetch(`${API_URL}/appointments/${id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error("Failed to delete appointment");
+  return res.json();
+};
+
 export const fetchNotifications = async () => {
   const res = await fetch(`${API_URL}/notifications`);
   if (!res.ok) throw new Error("Failed to fetch notifications");
@@ -54,3 +63,76 @@ export const markNotificationRead = async (id: string) => {
   if (!res.ok) throw new Error("Failed to mark notification read");
   return res.json();
 };
+
+export const requestOtp = async (phone: string, role: string) => {
+  const res = await fetch(`${API_URL}/auth/request-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, role }),
+  });
+  if (!res.ok) throw new Error("Failed to request OTP");
+  return res.json();
+};
+
+export const verifyOtp = async (phone: string, otp: string, role: string) => {
+  const res = await fetch(`${API_URL}/auth/verify-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, otp, role }),
+  });
+  
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || "Failed to verify OTP");
+  }
+  return res.json();
+};
+
+export const fetchTreatments = async () => {
+  const res = await fetch(`${API_URL}/treatments`);
+  if (!res.ok) throw new Error("Failed to fetch treatments");
+  return res.json();
+};
+
+export const createTreatment = async (data: any) => {
+  const res = await fetch(`${API_URL}/treatments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to create treatment");
+  return res.json();
+};
+
+export const fetchPrescriptions = async () => {
+  const res = await fetch(`${API_URL}/prescriptions`);
+  if (!res.ok) throw new Error("Failed to fetch prescriptions");
+  return res.json();
+};
+
+export const createPrescription = async (data: any) => {
+  const res = await fetch(`${API_URL}/prescriptions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to create prescription");
+  return res.json();
+};
+
+export const fetchInvoices = async () => {
+  const res = await fetch(`${API_URL}/invoices`);
+  if (!res.ok) throw new Error("Failed to fetch invoices");
+  return res.json();
+};
+
+export const createInvoice = async (data: any) => {
+  const res = await fetch(`${API_URL}/invoices`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to create invoice");
+  return res.json();
+};
+

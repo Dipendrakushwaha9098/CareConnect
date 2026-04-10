@@ -4,7 +4,8 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: "admin" | "doctor" | "therapist";
+  phone?: string;
+  role: "admin" | "doctor" | "therapist" | "patient";
 }
 
 interface AuthContextType {

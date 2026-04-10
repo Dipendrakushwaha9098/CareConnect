@@ -1,5 +1,6 @@
-import { useState, useEffect, createElement } from "react";
+import { useState, createElement, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   Plus, Clock, CheckCircle2, AlertCircle, Calendar,
@@ -9,13 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedCubes3D } from "@/components/AnimatedCubes3D";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { fetchAppointments, createAppointment, deleteAppointment, fetchPatients, fetchTreatments } from "@/lib/api";
+import { useSocket } from "@/hooks/useSocket";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 type AppointmentStatus = "Scheduled" | "Ongoing" | "Completed";
 
@@ -42,16 +46,68 @@ const STATUS_ICONS: Record<AppointmentStatus, React.ElementType> = {
   Completed: CheckCircle2,
 };
 
-
 export default function AppointmentsPage() {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const queryClient = useQueryClient();
+  const { socket } = useSocket();
+  const { user } = useAuth();
+  
+  const isPatient = user?.role === "patient";
+
+  const { data: appointments = [], isLoading } = useQuery<Appointment[]>({
+    queryKey: ["appointments"],
+    queryFn: fetchAppointments,
+  });
+
+  const { data: patients = [] } = useQuery<any[]>({
+    queryKey: ["patients"],
+    queryFn: fetchPatients,
+  });
+
+  const { data: treatments = [] } = useQuery<any[]>({
+    queryKey: ["treatments"],
+    queryFn: fetchTreatments,
+  });
+  
+  const currentPatient = isPatient ? patients.find(p => p.name === user?.name || p.userId === user?.id) : null;
+
+  const createMutation = useMutation({
+    mutationFn: createAppointment,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      setDialogOpen(false);
+      setNewForm({ patientId: "", therapy: "", date: "", time: "", notes: "" });
+      toast.success("Appointment created successfully!");
+    },
+    onError: () => {
+      toast.error("Failed to create appointment.");
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteAppointment,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      setDeleteConfirm(null);
+    },
+  });
+
+  useEffect(() => {
+    if (!socket) return;
+    socket.on("appointmentCreated", () => queryClient.invalidateQueries({ queryKey: ["appointments"] }));
+    socket.on("appointmentDeleted", () => queryClient.invalidateQueries({ queryKey: ["appointments"] }));
+    return () => {
+      socket.off("appointmentCreated");
+      socket.off("appointmentDeleted");
+    };
+  }, [socket, queryClient]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "All">("All");
   const [dateFilter, setDateFilter] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const [newForm, setNewForm] = useState({
-    patient: "",
+    patientId: "",
     therapy: "",
     date: "",
     time: "",
@@ -60,51 +116,31 @@ export default function AppointmentsPage() {
 
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  // ✅ Load from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem("appointments");
-    if (stored) {
-      setAppointments(JSON.parse(stored));
-    }
-  }, []);
-
-  // ✅ Save to localStorage
-  useEffect(() => {
-    localStorage.setItem("appointments", JSON.stringify(appointments));
-  }, [appointments]);
-
-  // ✅ Create Appointment
   const handleCreate = () => {
-    if (!newForm.patient || !newForm.therapy || !newForm.date || !newForm.time) {
-      alert("Please fill all fields");
+    const finalPatientId = isPatient ? currentPatient?.id : newForm.patientId;
+    
+    if (!finalPatientId || !newForm.therapy || !newForm.date || !newForm.time) {
+      toast.error("Please fill all fields before creating an appointment.");
       return;
     }
-
-    const newAppointment: Appointment = {
-      id: Date.now().toString(),
-      patient: newForm.patient,
-      patientId: newForm.patient,
+    createMutation.mutate({
+      patientId: finalPatientId,
       therapy: newForm.therapy,
       date: newForm.date,
       time: newForm.time,
       status: "Scheduled",
       notes: newForm.notes,
-    };
-
-    setAppointments((prev) => [...prev, newAppointment]);
-
-    setDialogOpen(false);
-    setNewForm({ patient: "", therapy: "", date: "", time: "", notes: "" });
+    });
   };
 
-  // ✅ Delete Appointment
   const handleDelete = (id: string) => {
-    setAppointments((prev) => prev.filter((a) => a.id !== id));
-    setDeleteConfirm(null);
+    deleteMutation.mutate(id);
   };
 
   // ✅ Filtering
   const filtered = appointments.filter((appt) => {
+    if (isPatient && appt.patient !== user?.name && appt.patientId !== user?.id) return false;
+    
     return (
       (appt.patient.toLowerCase().includes(searchQuery.toLowerCase()) ||
         appt.therapy.toLowerCase().includes(searchQuery.toLowerCase())) &&
@@ -130,40 +166,42 @@ export default function AppointmentsPage() {
 
       <div className="relative z-10 p-6 space-y-6">
         {/* Header */}
-        <div className="flex justify-between">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h1 className="text-2xl font-bold">Appointments</h1>
 
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" /> Add
+              <Button className="w-full sm:w-auto">
+                <Plus className="w-4 h-4 mr-2" /> Add Appointment
               </Button>
             </DialogTrigger>
 
-            <DialogContent>
+            <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle>New Appointment</DialogTitle>
+                <DialogDescription>
+                  Fill out the details below to book a new appointment.
+                </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-3">
-                <Input placeholder="Patient"
-                  value={newForm.patient}
-                  onChange={(e) => setNewForm({ ...newForm, patient: e.target.value })}
-                />
+                {!isPatient && (
+                  <Select onValueChange={(v) => setNewForm({ ...newForm, patientId: v })}>
+                    <SelectTrigger><SelectValue placeholder="Select Patient" /></SelectTrigger>
+                    <SelectContent>
+                      {patients.map((p: any) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
 
                 <Select onValueChange={(v) => setNewForm({ ...newForm, therapy: v })}>
-                  <SelectTrigger><SelectValue placeholder="Therapy" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select Therapy/Service" /></SelectTrigger>
                   <SelectContent>
-                      <SelectItem value="Abhyanga">Abhyanga (Oil Massage)</SelectItem>
-                      <SelectItem value="Shirodhara">Shirodhara</SelectItem>
-                      <SelectItem value="Vamana">Vamana (Therapeutic Emesis)</SelectItem>
-                      <SelectItem value="Virechana">Virechana (Purgation Therapy)</SelectItem>
-                      <SelectItem value="Basti">Basti (Medicated Enema)</SelectItem>
-                      <SelectItem value="Nasya">Nasya (Nasal Therapy)</SelectItem>
-                      <SelectItem value="Raktamokshana">Raktamokshana (Blood Detox)</SelectItem>
-                      <SelectItem value="Pizhichil">Pizhichil (Oil Bath Therapy)</SelectItem>
-                      <SelectItem value="Kati Basti">Kati Basti (Back Pain Therapy)</SelectItem>
-                      <SelectItem value="Udwarthanam">Udwarthanam (Herbal Powder Massage)</SelectItem>
+                    {treatments.map((t: any) => (
+                      <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 
@@ -177,7 +215,7 @@ export default function AppointmentsPage() {
                   onChange={(e) => setNewForm({ ...newForm, time: e.target.value })}
                 />
 
-                <Button onClick={handleCreate}>Create</Button>
+                <Button onClick={handleCreate} className="w-full">Create</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -192,35 +230,39 @@ export default function AppointmentsPage() {
 
         {/* List */}
         {dates.length === 0 ? (
-          <p>No appointments</p>
+          <p>No appointments match your criteria.</p>
         ) : (
           dates.map((date) => (
             <div key={date}>
-              <h2 className="font-bold">{date}</h2>
+              <h2 className="font-bold mb-3">{date}</h2>
 
+              <div className="space-y-3">
               {grouped[date].map((appt) => {
                 const Icon = STATUS_ICONS[appt.status];
 
                 return (
-                  <div key={appt.id} className="p-3 border rounded flex justify-between">
+                  <div key={appt.id} className="p-4 border rounded-xl flex flex-col sm:flex-row justify-between gap-4 sm:gap-0 bg-white">
                     <div>
-                      <p>{appt.patient}</p>
-                      <p className="text-sm">{appt.therapy}</p>
+                      <p className="font-medium">{appt.patient}</p>
+                      <p className="text-sm text-muted-foreground">{appt.therapy}</p>
+                      <p className="text-xs text-muted-foreground mt-1 sm:hidden">{appt.time}</p>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex items-center justify-between sm:justify-end gap-3">
+                      <p className="text-sm text-muted-foreground hidden sm:block mr-2">{appt.time}</p>
                       <Badge className={STATUS_COLORS[appt.status]}>
                         {createElement(Icon, { className: "w-3 h-3 mr-1" })}
                         {appt.status}
                       </Badge>
 
-                      <button onClick={() => setDeleteConfirm(appt.id)}>
+                      <button onClick={() => setDeleteConfirm(appt.id)} className="p-2 hover:bg-red-50 rounded-md transition-colors">
                         <Trash2 className="w-4 h-4 text-red-500" />
                       </button>
                     </div>
                   </div>
                 );
               })}
+              </div>
             </div>
           ))
         )}

@@ -10,12 +10,24 @@ datasource db {
   url      = "file:./dev.db"
 }
 
+model User {
+  id        String   @id @default(uuid())
+  phone     String   @unique
+  name      String
+  role      String   @default("patient") // 'patient' | 'doctor'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  patient   Patient?
+}
+
 model Patient {
   id             String        @id @default(uuid())
+  userId         String?       @unique
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   name           String
   age            Int
   gender         String
-  dosha          String
+  dosha          String?
   phone          String
   bloodGroup     String?
   address        String?
@@ -46,4 +58,38 @@ model Notification {
   type      String   @default("info")
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+model Treatment {
+  id        String   @id @default(uuid())
+  name      String
+  category  String?  // E.g., 'Ayurveda', 'General Medicine', 'Physiotherapy'
+  desc      String
+  duration  String
+  type      String?  // Replaces specific 'dosha' text to be more broad
+  sessions  Int      @default(1)
+  completed Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Prescription {
+  id        String   @id @default(uuid())
+  patient   String
+  doctor    String
+  date      String
+  medicines String   // JSON array as string
+  status    String   @default("Active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Invoice {
+  id        String   @id @default(uuid())
+  patient   String
+  amount    String
+  date      String
+  paid      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
