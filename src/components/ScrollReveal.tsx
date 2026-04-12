@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+//  Types 
 
 type Direction = "left" | "right" | "bottom";
 
