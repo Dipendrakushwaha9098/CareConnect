@@ -7,7 +7,6 @@ import { fetchNotifications, markNotificationRead } from "@/lib/api";
 import { useSocket } from "@/hooks/useSocket";
 import { AnimatedGrid3D } from "@/components/AnimatedGrid3D";
 
-
 const iconMap: Record<string, typeof Bell> = {
   appointment: CalendarDays,
   therapy: Leaf,
@@ -15,7 +14,6 @@ const iconMap: Record<string, typeof Bell> = {
   message: MessageSquare,
   info: Bell,
 };
-
 
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
@@ -33,7 +31,7 @@ export default function NotificationsPage() {
     },
   });
 
-  
+
   useEffect(() => {
     if (!socket) return;
     socket.on("notificationCreated", () => {
