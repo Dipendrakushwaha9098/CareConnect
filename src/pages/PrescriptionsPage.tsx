@@ -2,9 +2,9 @@ import { motion } from "framer-motion";
 import { FileText, Download, IndianRupee, CheckCircle2, Clock, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AnimatedCubes3D } from "@/components/AnimatedCubes3D";
 import { useQuery } from "@tanstack/react-query";
-import { fetchPrescriptions, fetchInvoices } from "@/lib/api";
+import { fetchPrescriptions, fetchInvoices, fetchPatients } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -20,6 +20,9 @@ const itemVariants = {
 };
 
 export default function PrescriptionsPage() {
+  const { user } = useAuth();
+  const isPatient = user?.role === "patient";
+
   const { data: prescriptions = [], isLoading: isLoadingRx } = useQuery<any[]>({
     queryKey: ["prescriptions"],
     queryFn: fetchPrescriptions,
@@ -30,13 +33,29 @@ export default function PrescriptionsPage() {
     queryFn: fetchInvoices,
   });
 
+  const { data: patients = [] } = useQuery<any[]>({
+    queryKey: ["patients"],
+    queryFn: fetchPatients,
+  });
+
+  const currentPatient = isPatient ? patients.find(p => p.name === user?.name || p.userId === user?.id) : null;
+
+  const filteredPrescriptions = prescriptions.filter((rx) => {
+    if (isPatient) {
+      return rx.patient === user?.name || (currentPatient && rx.patient === currentPatient.name);
+    }
+    return true;
+  });
+
+  const filteredInvoices = invoices.filter((inv) => {
+    if (isPatient) {
+      return inv.patient === user?.name || (currentPatient && inv.patient === currentPatient.name);
+    }
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-background">
-      {/* 3D Animated Background */}
-      <div className="fixed top-0 left-0 w-screen h-screen opacity-10 pointer-events-none z-0">
-        <AnimatedCubes3D />
-      </div>
-
       {/* Content */}
       <div className="relative z-10 px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -44,9 +63,11 @@ export default function PrescriptionsPage() {
           <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">Prescriptions & Billing</h1>
           <p className="text-sm text-muted-foreground mt-1">Digital prescriptions and invoices</p>
         </div>
-        <Button className="w-full sm:w-auto flex gradient-sage text-primary-foreground border-0 btn-ripple">
-          <Plus className="w-4 h-4 mr-2" /> Create New
-        </Button>
+        {!isPatient && (
+          <Button className="w-full sm:w-auto flex gradient-sage text-primary-foreground border-0 btn-ripple">
+            <Plus className="w-4 h-4 mr-2" /> Create New
+          </Button>
+        )}
       </motion.div>
 
       {/* Prescriptions */}
@@ -54,11 +75,11 @@ export default function PrescriptionsPage() {
         <h2 className="font-display text-xl font-semibold text-foreground">Prescriptions</h2>
         {isLoadingRx ? (
           <p className="text-muted-foreground text-sm">Loading prescriptions...</p>
-        ) : prescriptions.length === 0 ? (
+        ) : filteredPrescriptions.length === 0 ? (
           <p className="text-muted-foreground text-sm">No prescriptions found.</p>
         ) : (
           <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid gap-3">
-            {prescriptions.map((rx) => {
+            {filteredPrescriptions.map((rx) => {
               let parsedMedicines: string[] = [];
               try {
                 parsedMedicines = JSON.parse(rx.medicines);
@@ -129,11 +150,11 @@ export default function PrescriptionsPage() {
         <h2 className="font-display text-xl font-semibold text-foreground">Invoices</h2>
         {isLoadingInv ? (
            <p className="text-muted-foreground text-sm">Loading invoices...</p>
-        ) : invoices.length === 0 ? (
+        ) : filteredInvoices.length === 0 ? (
            <p className="text-muted-foreground text-sm">No invoices found.</p>
         ) : (
           <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid gap-3">
-            {invoices.map((inv) => (
+            {filteredInvoices.map((inv) => (
                 <motion.div
                   key={inv.id}
                   variants={itemVariants}

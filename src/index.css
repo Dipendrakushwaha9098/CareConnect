@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
+    --background: 210 40% 98.5%;
     --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
@@ -15,11 +15,11 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 221.2 83.2% 53.3%;
+    --primary: 217 91% 60%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 173 80% 40%;
+    --secondary-foreground: 210 40% 98%;
 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
@@ -32,21 +32,23 @@
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --ring: 217 91% 60%;
 
-    --radius: 0.75rem;
+    --radius: 1.25rem;
 
-    /* Custom tokens */
-    --medical-blue: 221.2 83.2% 53.3%;
-    --medical-teal: 173 58% 39%;
+    /* Premium Medical Design Tokens */
+    --medical-trust: #0f172a;
+    --medical-safe: #2563eb;
+    --medical-heal: #10b981;
+    --medical-vital: #ef4444;
     
-    --glass-bg: 255 255 255 / 0.8;
-    --glass-border: 214 31% 91% / 0.5;
-    --shadow-soft: 0 4px 24px -4px hsl(222.2 84% 4.9% / 0.08);
-    --shadow-lifted: 0 12px 40px -8px hsl(222.2 84% 4.9% / 0.12);
+    --glass-bg: rgba(255, 255, 255, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.4);
+    --shadow-premium: 0 25px 50px -12px rgba(0, 0, 0, 0.12);
+    --shadow-medical: 0 10px 30px -5px rgba(37, 99, 235, 0.1);
 
-    --gradient-hero: linear-gradient(135deg, hsl(221.2 83.2% 53.3%), hsl(221.2 83.2% 40%));
-    --gradient-teal: linear-gradient(135deg, hsl(173 58% 39%), hsl(173 58% 30%));
+    --font-heading: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+    --font-body: 'Inter', sans-serif;
   }
 }
 
@@ -55,60 +57,85 @@
     @apply border-border;
   }
 
+  html {
+    /* Increase base font size slightly (default is 16px) */
+    font-size: 17px;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: var(--font-body);
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: var(--font-heading);
+    @apply tracking-tight;
   }
 }
 
 @layer components {
-  .glass-card {
-    @apply bg-white/80 backdrop-blur-xl border border-border/50 rounded-xl;
-    box-shadow: var(--shadow-soft);
+  .medical-glass {
+    @apply bg-white/70 backdrop-blur-2xl border border-white/50;
+    box-shadow: var(--shadow-premium);
   }
 
-  .glass-card-hover {
-    @apply glass-card transition-all duration-300;
+  .premium-card {
+    @apply bg-white border border-slate-100 rounded-[2rem] overflow-hidden;
+    box-shadow: var(--shadow-medical);
+    transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
   }
 
-  .glass-card-hover:hover {
-    box-shadow: var(--shadow-lifted);
-    transform: translateY(-2px);
+  .premium-card:hover {
+    @apply -translate-y-2;
+    box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.15);
   }
 
-  .gradient-hero {
-    background: var(--gradient-hero);
+  .text-gradient-medical {
+    @apply bg-clip-text text-transparent bg-gradient-to-br from-blue-700 via-blue-600 to-teal-500;
   }
 
-  .gradient-teal {
-    background: var(--gradient-teal);
+  .btn-magnetic {
+    @apply transition-all duration-300 ease-out hover:scale-105 active:scale-95;
+    transform-style: preserve-3d;
   }
 
-  .text-gradient-primary {
-    @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(221.2 83.2% 53.3%), hsl(221.2 83.2% 40%));
+  .section-container {
+    @apply max-w-7xl mx-auto px-6 md:px-12;
   }
 
-  .text-gradient-teal {
-    @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(173 58% 39%), hsl(173 58% 30%));
+  .medical-shimmer {
+    @apply relative overflow-hidden;
   }
+  
+  .medical-shimmer::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: shimmer 3s infinite;
+  }
+}
 
-  .shimmer {
-    @apply animate-pulse bg-muted rounded-lg;
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
   }
 }
 
 @layer utilities {
-  .font-display {
-    font-family: 'Plus Jakarta Sans', sans-serif;
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  
+  .perspective-2000 {
+    perspective: 2000px;
   }
 
-  .font-body {
-    font-family: 'Inter', system-ui, sans-serif;
+  .translate-z-10 { transform: translateZ(10px); }
+  .translate-z-20 { transform: translateZ(20px); }
+  .translate-z-50 { transform: translateZ(50px); }
+
+  .mask-radial {
+    mask-image: radial-gradient(circle at center, black, transparent 80%);
   }
 }
+

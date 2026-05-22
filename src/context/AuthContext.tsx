@@ -24,7 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Check local storage for existing session
-    const storedUser = localStorage.getItem("vedaCare_user");
+    const storedUser = localStorage.getItem("careConnect_user");
     if (storedUser) {
       try {
         setUser(JSON.parse(storedUser));
@@ -37,12 +37,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = (userData: User) => {
     setUser(userData);
-    localStorage.setItem("vedaCare_user", JSON.stringify(userData));
+    localStorage.setItem("careConnect_user", JSON.stringify(userData));
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("vedaCare_user");
+    localStorage.removeItem("careConnect_user");
   };
 
   const value = {

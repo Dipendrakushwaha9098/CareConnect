@@ -12,7 +12,8 @@ datasource db {
 
 model User {
   id        String   @id @default(uuid())
-  phone     String   @unique
+  email     String   @unique
+  phone     String?
   name      String
   role      String   @default("patient") // 'patient' | 'doctor'
   createdAt DateTime @default(now())
@@ -28,7 +29,8 @@ model Patient {
   age            Int
   gender         String
   dosha          String?
-  phone          String
+  email          String?
+  phone          String?
   bloodGroup     String?
   address        String?
   medicalHistory String?
@@ -45,6 +47,7 @@ model Appointment {
   therapy   String
   date      String // Format YYYY-MM-DD
   time      String // Format HH:MM AM/PM
+  notes     String?
   status    String   @default("Scheduled")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

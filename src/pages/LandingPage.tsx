@@ -1,27 +1,51 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence, useScroll, useTransform, useSpring } from "framer-motion";
 import {
   HeartPulse,
   Calendar,
-  Clock,
   ShieldCheck,
   Stethoscope,
-  ChevronRight,
-  ArrowRight,
   Activity,
   Menu,
   X,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  CheckCircle2,
+  Sparkles,
+  ArrowRight,
+  Brain,
+  Dna,
+  Microscope,
+  Baby,
+  ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatedImage3D } from "@/components/AnimatedImage3D";
 
+const specialties = [
+  { icon: HeartPulse, title: "Cardiology", desc: "Advanced heart care and vascular diagnostics.", color: "text-red-500", bg: "bg-red-50" },
+  { icon: Brain, title: "Neurology", desc: "Expert treatment for complex neurological conditions.", color: "text-blue-500", bg: "bg-blue-50" },
+  { icon: Baby, title: "Pediatrics", desc: "Specialized care for children and adolescents.", color: "text-amber-500", bg: "bg-amber-50" },
+  { icon: Dna, title: "Genetics", desc: "Cutting-edge genetic screening and counseling.", color: "text-teal-500", bg: "bg-teal-50" },
+  { icon: Microscope, title: "Diagnostics", desc: "Precise lab results with next-gen technology.", color: "text-purple-500", bg: "bg-purple-50" },
+  { icon: Stethoscope, title: "Primary Care", desc: "Comprehensive health services for the whole family.", color: "text-emerald-500", bg: "bg-emerald-50" }
+];
+
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const heroRef = useRef(null);
+  
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"]
+  });
+
+  const heroY = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
+  const heroScale = useTransform(scrollYProgress, [0, 1], [1, 0.9]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -31,125 +55,228 @@ export default function LandingPage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const fadeIn = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.15,
+        delayChildren: 0.4,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } 
+    },
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-body selection:bg-blue-200">
+    <div className="min-h-screen bg-[#fafbfc] flex flex-col font-body selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden">
       
       {/* ── Navbar ── */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled ? "bg-white/90 backdrop-blur-md shadow-sm py-3" : "bg-transparent py-5"
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ease-in-out px-4 py-4 md:px-8 ${
+          scrolled ? "pt-4" : "pt-8"
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 md:px-8 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-md">
-              <HeartPulse className="w-6 h-6 text-white" />
-            </div>
-            <span className="font-display text-2xl font-bold text-gray-900 tracking-tight">CareConnect</span>
+        <div 
+          className={`max-w-7xl mx-auto flex items-center justify-between transition-all duration-700 px-8 py-3 rounded-full ${
+            scrolled 
+              ? "medical-glass shadow-premium border-white/60 translate-y-0" 
+              : "bg-transparent translate-y-0"
+          }`}
+        >
+          <Link to="/" className="flex items-center gap-3 group">
+            <motion.div 
+              whileHover={{ rotate: 360 }}
+              transition={{ duration: 0.8 }}
+              className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-xl shadow-blue-200 group-hover:scale-110 transition-all"
+            >
+              <HeartPulse className="w-7 h-7 text-white" />
+            </motion.div>
+            <span className="font-heading text-2xl font-black text-slate-900 tracking-tight">CareConnect</span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-8 font-medium text-gray-600">
-            <a href="#services" className="hover:text-blue-600 transition-colors">Services</a>
-            <a href="#about" className="hover:text-blue-600 transition-colors">About</a>
-            <a href="#contact" className="hover:text-blue-600 transition-colors">Contact</a>
-            <Link to="/login">
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6 shadow-lg shadow-blue-200 transition-all duration-300 hover:scale-105">
-                Portal Login <ArrowRight className="w-4 h-4 ml-2" />
+          <div className="hidden md:flex items-center gap-12 font-bold text-slate-600">
+            {["Services", "About", "Centers", "Support"].map((item) => (
+               <a 
+                key={item}
+                href={`#${item.toLowerCase()}`} 
+                className="hover:text-blue-600 transition-all relative group py-2"
+              >
+                {item}
+                <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-blue-600 transition-all group-hover:w-full rounded-full" />
+              </a>
+            ))}
+            <Link to="/login" className="btn-magnetic">
+              <Button className="bg-slate-900 hover:bg-black text-white rounded-full px-10 h-14 shadow-2xl shadow-slate-200 transition-all font-bold text-base">
+                Portal Access <ChevronRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
           </div>
 
           <button
-            className="md:hidden text-gray-800"
+            className="md:hidden text-slate-800 p-3 hover:bg-slate-100 rounded-full transition-colors"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {mobileMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
           </button>
         </div>
       </nav>
 
       {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-white pt-24 px-4 md:hidden flex flex-col gap-4 text-lg">
-          <a href="#services" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b">Services</a>
-          <a href="#about" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b">About</a>
-          <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b">Contact</a>
-          <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
-            <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white text-lg h-12 rounded-xl">
-              Portal Login
-            </Button>
-          </Link>
-        </div>
-      )}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0, x: "100%" }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: "100%" }}
+            className="fixed inset-0 z-40 bg-white pt-32 px-8 md:hidden flex flex-col gap-8"
+          >
+            {["Services", "About", "Centers", "Support"].map((item) => (
+              <a 
+                key={item} 
+                href={`#${item.toLowerCase()}`} 
+                onClick={() => setMobileMenuOpen(false)} 
+                className="text-3xl font-black text-slate-900 py-4 border-b border-slate-50 flex items-center justify-between"
+              >
+                {item} <ChevronRight className="w-6 h-6 text-slate-300" />
+              </a>
+            ))}
+            <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
+              <Button className="w-full mt-8 bg-blue-600 hover:bg-blue-700 text-white text-xl h-16 rounded-3xl shadow-2xl shadow-blue-100 font-black">
+                Portal Login
+              </Button>
+            </Link>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Hero Section ── */}
-      <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
-        {/* Background Gradients */}
-        <div className="absolute top-0 right-0 w-[50vw] h-[50vw] bg-teal-100/40 blur-[100px] rounded-full -translate-y-1/2 translate-x-1/3" />
-        <div className="absolute bottom-0 left-0 w-[40vw] h-[40vw] bg-blue-100/50 blur-[100px] rounded-full translate-y-1/3 -translate-x-1/4" />
+      <section ref={heroRef} className="relative pt-52 pb-24 md:pt-64 md:pb-40 min-h-screen flex items-center overflow-visible">
+        {/* Animated Orbs */}
+        <motion.div 
+          animate={{ x: [0, 50, 0], y: [0, -30, 0] }}
+          transition={{ repeat: Infinity, duration: 20, ease: "easeInOut" }}
+          className="absolute top-0 right-0 w-[70vw] h-[70vw] bg-blue-100/30 blur-[150px] rounded-full -translate-y-1/2 translate-x-1/4 pointer-events-none" 
+        />
+        <motion.div 
+          animate={{ x: [0, -60, 0], y: [0, 40, 0] }}
+          transition={{ repeat: Infinity, duration: 25, ease: "easeInOut" }}
+          className="absolute bottom-0 left-0 w-[60vw] h-[60vw] bg-teal-50/40 blur-[150px] rounded-full translate-y-1/4 -translate-x-1/4 pointer-events-none" 
+        />
 
-        <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <motion.div initial="hidden" animate="visible" variants={fadeIn}>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-sm font-semibold mb-6">
-                <Activity className="w-4 h-4" /> Leading Healthcare Platform
-              </div>
-              <h1 className="font-display text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 leading-[1.1] mb-6">
-                Simplify your <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-teal-500">clinic visits.</span>
-              </h1>
-              <p className="text-lg text-gray-600 mb-8 max-w-lg leading-relaxed">
-                Connect with top-tier medical professionals instantly. Book appointments, manage records, and track treatments seamlessly within our unified portal.
-              </p>
+        <div className="section-container relative z-10 w-full">
+          <div className="grid lg:grid-cols-2 gap-20 items-center">
+            <motion.div 
+              style={{ y: heroY, opacity: heroOpacity }}
+              initial="hidden" 
+              whileInView="visible" 
+              viewport={{ once: true }} 
+              variants={containerVariants}
+              className="max-w-xl"
+            >
+              <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-sm font-black mb-10 shadow-sm uppercase tracking-widest">
+                <Sparkles className="w-4 h-4" /> Leading the Medical Revolution
+              </motion.div>
               
-              <div className="flex flex-wrap items-center gap-4">
-                <Link to="/login">
-                  <Button className="h-14 px-8 text-lg bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-xl shadow-blue-200 transition-all hover:-translate-y-1">
-                    Book an Appointment
+              <motion.h1 variants={itemVariants} className="font-heading text-6xl md:text-7xl lg:text-8xl font-black text-slate-900 leading-[0.95] mb-10">
+                The Future of <br />
+                <span className="text-gradient-medical">Healthcare.</span>
+              </motion.h1>
+              
+              <motion.p variants={itemVariants} className="text-2xl text-slate-500 mb-12 leading-relaxed font-medium">
+                CareConnect unifies your medical journey. Experience a platform where specialists, technology, and patient care converge for a healthier tomorrow.
+              </motion.p>
+              
+              <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-8">
+                <Link to="/login" className="btn-magnetic">
+                  <Button className="h-20 px-12 text-xl bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-[0_20px_50px_rgba(37,99,235,0.3)] transition-all font-black">
+                    Get Started Now
                   </Button>
                 </Link>
-                <div className="flex -space-x-3 items-center ml-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className={`w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center overflow-hidden z-[${10-i}]`}>
-                        <img src={`https://i.pravatar.cc/100?img=${i+10}`} alt="User" />
-                    </div>
-                  ))}
-                  <div className="pl-6 text-sm font-semibold text-gray-700">
-                    Trusted by 10k+ Patients
+                <div className="flex flex-col gap-3">
+                  <div className="flex -space-x-4 items-center">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <motion.div 
+                        key={i} 
+                        whileHover={{ y: -8, zIndex: 30, scale: 1.1 }}
+                        className="w-14 h-14 rounded-full border-4 border-white bg-slate-100 flex items-center justify-center overflow-hidden shadow-xl ring-1 ring-slate-100"
+                      >
+                          <img src={`https://i.pravatar.cc/100?img=${i+40}`} alt="User" className="w-full h-full object-cover" />
+                      </motion.div>
+                    ))}
+                    <div className="w-14 h-14 rounded-full border-4 border-white bg-slate-900 flex items-center justify-center text-white text-xs font-black shadow-xl ring-1 ring-slate-100">+25k</div>
+                  </div>
+                  <div className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] pl-1">
+                    Certified Medical Excellence
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
 
             <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }} 
-                animate={{ opacity: 1, scale: 1 }} 
-                transition={{ duration: 0.8, delay: 0.2 }}
-                className="relative hidden md:block"
+               style={{ scale: heroScale, opacity: heroOpacity }}
+                initial={{ opacity: 0, x: 100, rotate: 5 }}
+                whileInView={{ opacity: 1, x: 0, rotate: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+                className="relative hidden lg:block"
             >
-              <div className="relative rounded-3xl overflow-visible aspect-[4/3] z-10 hidden md:block">
+              <div className="relative rounded-[3.5rem] overflow-visible aspect-[10/12] z-10">
                 <AnimatedImage3D 
-                  src="https://images.unsplash.com/photo-1638202993928-7267aad84c31?auto=format&fit=crop&q=80&w=1600" 
-                  alt="Modern Clinic" 
+                  src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=2070" 
+                  alt="Realistic Medical Professional" 
+                  className="rounded-[3.5rem]"
                 />
               </div>
               
-              {/* Floating Cards */}
+              {/* Floating Pulse Widget */}
               <motion.div 
-                animate={{ y: [0, -10, 0] }}
-                transition={{ repeat: Infinity, duration: 5 }}
-                className="absolute -bottom-6 -left-6 bg-white p-4 rounded-2xl shadow-xl border border-gray-100 flex items-center gap-4"
+                animate={{ y: [0, -20, 0] }}
+                transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
+                className="absolute -top-12 -right-12 medical-glass p-8 rounded-[2.5rem] border-white/80 z-20 flex flex-col gap-4 min-w-[200px]"
               >
-                <div className="w-12 h-12 bg-teal-50 rounded-full flex items-center justify-center">
-                  <Calendar className="w-6 h-6 text-teal-600" />
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-blue-600 rounded-3xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                    <Activity className="w-8 h-8 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Global Status</div>
+                    <div className="font-black text-slate-900 text-xl leading-none">Operational</div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                   <div className="flex justify-between text-xs font-bold text-slate-500">
+                      <span>Server Latency</span>
+                      <span>12ms</span>
+                   </div>
+                   <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <motion.div 
+                      animate={{ width: ["0%", "92%"] }}
+                      transition={{ duration: 2, delay: 1 }}
+                      className="bg-emerald-500 h-full rounded-full" 
+                    />
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div 
+                animate={{ y: [0, 20, 0] }}
+                transition={{ repeat: Infinity, duration: 10, ease: "easeInOut", delay: 1 }}
+                className="absolute -bottom-12 -left-12 medical-glass p-8 rounded-[2.5rem] border-white/80 z-20 flex items-center gap-5"
+              >
+                <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center shadow-2xl shadow-emerald-200 border-4 border-white">
+                  <CheckCircle2 className="w-10 h-10 text-white" />
                 </div>
                 <div>
-                  <div className="font-bold text-gray-900">Zero Wait Time</div>
-                  <div className="text-xs text-gray-500">Instant Confirmations</div>
+                  <div className="font-black text-slate-900 text-2xl leading-none mb-1">HIPAA Verified</div>
+                  <div className="text-sm text-slate-500 font-bold tracking-tight">Encrypted Healthcare Vaults</div>
                 </div>
               </motion.div>
             </motion.div>
@@ -157,93 +284,284 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Features ── */}
-      <section id="services" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="font-display text-4xl font-bold text-gray-900 mb-4">Comprehensive Care</h2>
-            <p className="text-gray-600">Everything you need to manage your health journey natively tailored inside a secure platform.</p>
+      {/* ── Specialties Section ── */}
+      <section id="services" className="py-32 md:py-48 bg-white relative">
+        <div className="section-container">
+          <div className="text-center max-w-4xl mx-auto mb-24">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              className="text-blue-600 font-black tracking-[0.3em] uppercase text-sm mb-6"
+            >
+              Our Expertise
+            </motion.div>
+            <motion.h2 
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="font-heading text-5xl md:text-7xl font-black text-slate-900 mb-10"
+            >
+              Specialized care for <span className="text-gradient-medical">every life.</span>
+            </motion.h2>
+            <motion.p 
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+              className="text-2xl text-slate-500 font-medium leading-relaxed"
+            >
+              We've brought together world-class specialists and cutting-edge diagnostic technology to provide a seamless health ecosystem.
+            </motion.p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { icon: Calendar, title: "Smart Scheduling", desc: "Book, reschedule, or cancel appointments dynamically 24/7 without making a single phone call.", color: "text-blue-600", bg: "bg-blue-50" },
-              { icon: ShieldCheck, title: "Secure Records", desc: "HIPAA compliant storage of all your medical history, prescriptions, and test results.", color: "text-teal-600", bg: "bg-teal-50" },
-              { icon: Stethoscope, title: "Expert Doctors", desc: "Direct access to certified specialists dedicated to personalized and effective patient care.", color: "text-purple-600", bg: "bg-purple-50" }
-            ].map((feature, i) => (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {specialties.map((spec, i) => (
               <motion.div 
                 key={i} 
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 50 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:shadow-lg transition-shadow"
+                transition={{ delay: i * 0.1, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                whileHover={{ y: -15 }}
+                className="premium-card p-12 group cursor-pointer"
               >
-                <div className={`w-14 h-14 rounded-xl ${feature.bg} flex items-center justify-center mb-6`}>
-                  <feature.icon className={`w-7 h-7 ${feature.color}`} />
+                <div className={`w-20 h-20 rounded-3xl ${spec.bg} flex items-center justify-center mb-10 transition-all group-hover:rotate-6 duration-500 group-hover:scale-110 shadow-sm`}>
+                  <spec.icon className={`w-10 h-10 ${spec.color}`} />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3">{feature.title}</h3>
-                <p className="text-gray-600 leading-relaxed max-w-sm">{feature.desc}</p>
+                <h3 className="text-3xl font-black text-slate-900 mb-5 tracking-tight">{spec.title}</h3>
+                <p className="text-lg text-slate-500 font-medium leading-relaxed mb-8">{spec.desc}</p>
+                <div className="flex items-center gap-2 text-blue-600 font-black uppercase text-xs tracking-widest opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0">
+                  Explore Department <ArrowRight className="w-4 h-4" />
+                </div>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── CTA ── */}
-      <section className="py-24 relative overflow-hidden bg-slate-900 text-white">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80')] mix-blend-overlay opacity-20 object-cover" />
-        <div className="max-w-4xl mx-auto px-4 md:px-8 relative z-10 text-center">
-          <h2 className="font-display text-4xl md:text-5xl font-bold mb-6">Ready to prioritize your health?</h2>
-          <p className="text-lg text-gray-300 mb-10 max-w-2xl mx-auto">
-            Join thousands of patients who have already streamlined their healthcare experience.
-          </p>
-          <Link to="/login">
-             <Button className="h-14 px-10 text-lg bg-blue-500 hover:bg-blue-400 text-white rounded-full transition-all">
-                Access Patient Portal
-             </Button>
-          </Link>
+      {/* ── Global Impact / Stats ── */}
+      <section className="py-32 bg-slate-900 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&q=80&w=2070')] opacity-10 bg-fixed bg-cover pointer-events-none" />
+          <div className="section-container relative z-10">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-12">
+                 {[
+                   { label: "Patients Served", val: "1.2M+" },
+                   { label: "Expert Doctors", val: "450+" },
+                   { label: "Successful Surgeries", val: "12K+" },
+                   { label: "Global Centers", val: "15" }
+                 ].map((stat, i) => (
+                    <motion.div 
+                      key={i}
+                      initial={{ opacity: 0, y: 30 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: i * 0.1 }}
+                      className="text-center"
+                    >
+                       <div className="text-5xl md:text-6xl font-black text-white mb-4 tracking-tight">{stat.val}</div>
+                       <div className="text-sm font-black text-blue-400 uppercase tracking-[0.3em]">{stat.label}</div>
+                    </motion.div>
+                 ))}
+              </div>
+          </div>
+      </section>
+
+      {/* ── Realistic Center Section ── */}
+      <section id="centers" className="py-32 md:py-48 bg-[#fafbfc]">
+        <div className="section-container">
+           <div className="grid lg:grid-cols-2 gap-24 items-center">
+              <motion.div 
+                initial={{ opacity: 0, x: -50 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                className="relative"
+              >
+                 <div className="aspect-[4/5] rounded-[3.5rem] overflow-hidden shadow-premium relative group">
+                    <img 
+                      src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=2070" 
+                      className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" 
+                      alt="Modern Medical Center" 
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent opacity-60" />
+                    <div className="absolute bottom-12 left-12 right-12">
+                       <h4 className="text-3xl font-black text-white mb-4">CareConnect Oslo Center</h4>
+                       <div className="flex items-center gap-2 text-blue-200 font-bold mb-6">
+                          <MapPin className="w-5 h-5" /> Aker brygge 12, Oslo, Norway
+                       </div>
+                       <Button className="bg-white text-slate-900 hover:bg-white/90 rounded-full h-12 px-8 font-black">
+                         Schedule a Visit
+                       </Button>
+                    </div>
+                 </div>
+                 {/* Floating Card */}
+                 <motion.div 
+                  animate={{ y: [0, -15, 0] }}
+                  transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
+                  className="absolute -top-10 -right-10 medical-glass p-10 rounded-[3rem] shadow-premium hidden md:block max-w-[280px]"
+                 >
+                    <div className="text-blue-600 font-black uppercase text-xs tracking-widest mb-4">Patient Review</div>
+                    <p className="text-slate-600 font-bold italic mb-6">"The level of care and technological precision at CareConnect is truly unmatched."</p>
+                    <div className="flex items-center gap-3">
+                       <div className="w-10 h-10 rounded-full bg-slate-200" />
+                       <div>
+                          <p className="font-black text-slate-900 text-sm">Erik Janssen</p>
+                          <p className="text-xs text-slate-400 font-bold">Patient since 2024</p>
+                       </div>
+                    </div>
+                 </motion.div>
+              </motion.div>
+
+              <div className="space-y-12">
+                 <motion.div 
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                 >
+                    <h2 className="font-heading text-5xl md:text-6xl font-black text-slate-900 mb-8 leading-tight">
+                       Elegance meets <br /> <span className="text-gradient-medical">medical precision.</span>
+                    </h2>
+                    <p className="text-xl text-slate-500 font-medium leading-relaxed">
+                       Our medical centers are designed to be serene, clinical yet welcoming spaces where patients can feel at ease. We integrate advanced AI diagnostic tools with human compassion to ensure the best possible outcomes.
+                    </p>
+                 </motion.div>
+
+                 <div className="space-y-8">
+                    {[
+                      { icon: ShieldCheck, t: "Zero-Trust Security", d: "Your data is protected by the most advanced medical-grade encryption systems." },
+                      { icon: Stethoscope, t: "Expert Triage", d: "AI-assisted triage that ensures you see the right specialist within minutes of arrival." }
+                    ].map((feat, i) => (
+                       <motion.div 
+                        key={i}
+                        initial={{ opacity: 0, x: 30 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: i * 0.2 }}
+                        className="flex gap-6 items-start"
+                       >
+                          <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center shrink-0">
+                             <feat.icon className="w-7 h-7 text-blue-600" />
+                          </div>
+                          <div>
+                             <h4 className="text-xl font-black text-slate-900 mb-2 tracking-tight">{feat.t}</h4>
+                             <p className="text-slate-500 font-medium">{feat.d}</p>
+                          </div>
+                       </motion.div>
+                    ))}
+                 </div>
+              </div>
+           </div>
+        </div>
+      </section>
+
+      {/* ── Advanced CTA ── */}
+      <section className="py-24 md:py-48 relative overflow-hidden bg-white">
+        <div className="section-container">
+           <div className="relative rounded-[4rem] overflow-hidden bg-slate-900 px-8 py-24 md:px-24 md:py-40">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-600/60 via-transparent to-teal-500/20 pointer-events-none" />
+              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=2069')] mix-blend-overlay opacity-40 object-cover" />
+              
+              <div className="relative z-10 text-center max-w-4xl mx-auto">
+                <motion.h2 
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  className="font-heading text-5xl md:text-7xl font-black text-white mb-12 tracking-tight leading-[0.95]"
+                >
+                  Join the elite <br /> healthcare network.
+                </motion.h2>
+                <motion.p 
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.1 }}
+                  className="text-2xl text-blue-100/70 mb-16 font-medium leading-relaxed"
+                >
+                  Whether you're a patient seeking care or a practitioner looking to innovate, CareConnect is your gateway to excellence.
+                </motion.p>
+                <motion.div
+                  initial={{ opacity: 0, y: 40 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.2 }}
+                  className="flex flex-wrap justify-center gap-8"
+                >
+                  <Link to="/login" className="btn-magnetic">
+                    <Button className="h-20 px-16 text-xl bg-white text-slate-900 hover:bg-blue-50 rounded-full font-black shadow-2xl transition-all">
+                      Patient Portal
+                    </Button>
+                  </Link>
+                  <Link to="/login" className="btn-magnetic">
+                    <Button className="h-20 px-16 text-xl bg-transparent border-2 border-white/30 text-white hover:bg-white/10 rounded-full font-black backdrop-blur-md transition-all">
+                      Doctor Suite
+                    </Button>
+                  </Link>
+                </motion.div>
+              </div>
+           </div>
         </div>
       </section>
 
       {/* ── Footer ── */}
-      <footer id="contact" className="bg-gray-50 border-t border-gray-200 py-12">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 grid md:grid-cols-4 gap-8">
-          <div className="col-span-2">
-            <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-                <HeartPulse className="w-5 h-5 text-white" />
+      <footer id="contact" className="bg-[#fafbfc] py-32 border-t border-slate-100">
+        <div className="section-container grid grid-cols-1 md:grid-cols-4 gap-20">
+          <div className="md:col-span-2">
+            <Link to="/" className="flex items-center gap-3 mb-12">
+              <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center">
+                <HeartPulse className="w-7 h-7 text-white" />
               </div>
-              <span className="font-display text-xl font-bold text-gray-900 tracking-tight">CareConnect</span>
+              <span className="font-heading text-3xl font-black text-slate-900 tracking-tight">CareConnect</span>
             </Link>
-            <p className="text-gray-500 max-w-sm mb-6">Modernizing clinic operations and prioritizing seamless patient experiences globally.</p>
-            <div className="flex gap-4">
-                <a href="#" className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:text-blue-600 hover:border-blue-600 transition-all"><MapPin className="w-5 h-5" /></a>
-                <a href="#" className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:text-blue-600 hover:border-blue-600 transition-all"><Phone className="w-5 h-5" /></a>
-                <a href="#" className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:text-blue-600 hover:border-blue-600 transition-all"><Mail className="w-5 h-5" /></a>
+            <p className="text-slate-500 font-medium text-xl max-w-sm mb-12 leading-relaxed">
+              Pioneering the intersection of artificial intelligence and professional medical care.
+            </p>
+            <div className="flex gap-6">
+                {[MapPin, Phone, Mail].map((Icon, i) => (
+                  <motion.a 
+                    key={i}
+                    href="#" 
+                    whileHover={{ scale: 1.1, backgroundColor: "#2563eb", color: "#fff" }}
+                    className="w-16 h-16 rounded-3xl bg-white shadow-sm flex items-center justify-center text-slate-400 border border-slate-100 transition-all shadow-medical"
+                  >
+                    <Icon className="w-7 h-7" />
+                  </motion.a>
+                ))}
             </div>
           </div>
-          <div>
-            <h4 className="font-bold text-gray-900 mb-4">Platform</h4>
-            <ul className="space-y-3 text-gray-500">
-              <li><Link to="/login" className="hover:text-blue-600">Patient Login</Link></li>
-              <li><Link to="/login" className="hover:text-blue-600">Doctor Portal</Link></li>
-              <li><a href="#" className="hover:text-blue-600">Pricing</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-bold text-gray-900 mb-4">Legal</h4>
-            <ul className="space-y-3 text-gray-500">
-              <li><a href="#" className="hover:text-blue-600">Privacy Policy</a></li>
-              <li><a href="#" className="hover:text-blue-600">Terms of Service</a></li>
-              <li><a href="#" className="hover:text-blue-600">HIPAA Compliance</a></li>
-            </ul>
+          
+          <div className="grid grid-cols-2 gap-12 md:col-span-2">
+            <div>
+              <h4 className="font-black text-slate-900 mb-10 uppercase tracking-[0.2em] text-xs">Healthcare</h4>
+              <ul className="flex flex-col gap-6 text-slate-500 font-bold text-lg">
+                <li><Link to="/login" className="hover:text-blue-600 transition-colors">Patient Portal</Link></li>
+                <li><Link to="/login" className="hover:text-blue-600 transition-colors">Doctor Suite</Link></li>
+                <li><a href="#" className="hover:text-blue-600 transition-colors">Telehealth</a></li>
+                <li><a href="#" className="hover:text-blue-600 transition-colors">Emergency Hub</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-black text-slate-900 mb-10 uppercase tracking-[0.2em] text-xs">Resources</h4>
+              <ul className="flex flex-col gap-6 text-slate-500 font-bold text-lg">
+                <li><a href="#" className="hover:text-blue-600 transition-colors">Privacy & Data</a></li>
+                <li><a href="#" className="hover:text-blue-600 transition-colors">HIPAA Standards</a></li>
+                <li><a href="#" className="hover:text-blue-600 transition-colors">Help Center</a></li>
+                <li><a href="#" className="hover:text-blue-600 transition-colors">API Docs</a></li>
+              </ul>
+            </div>
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 md:px-8 mt-12 pt-8 border-t border-gray-200 text-center text-gray-500 text-sm">
-          &copy; {new Date().getFullYear()} CareConnect Health Inc. All rights reserved.
+        <div className="section-container mt-32 pt-12 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-10">
+          <div className="text-slate-400 font-bold text-base">
+            &copy; {new Date().getFullYear()} CareConnect Health Systems. All rights reserved.
+          </div>
+          <div className="flex gap-10 text-slate-400 font-bold text-base">
+            <a href="#" className="hover:text-slate-900 transition-colors tracking-tight">LinkedIn</a>
+            <a href="#" className="hover:text-slate-900 transition-colors tracking-tight">Twitter</a>
+            <a href="#" className="hover:text-slate-900 transition-colors tracking-tight">Instagram</a>
+          </div>
         </div>
       </footer>
     </div>
   );
 }
+

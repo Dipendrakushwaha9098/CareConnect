@@ -50,6 +50,16 @@ export const deleteAppointment = async (id: string) => {
   return res.json();
 };
 
+export const updateAppointment = async (id: string, data: any) => {
+  const res = await fetch(`${API_URL}/appointments/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update appointment");
+  return res.json();
+};
+
 export const fetchNotifications = async () => {
   const res = await fetch(`${API_URL}/notifications`);
   if (!res.ok) throw new Error("Failed to fetch notifications");
@@ -64,21 +74,21 @@ export const markNotificationRead = async (id: string) => {
   return res.json();
 };
 
-export const requestOtp = async (phone: string, role: string) => {
+export const requestOtp = async (email: string, role: string) => {
   const res = await fetch(`${API_URL}/auth/request-otp`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, role }),
+    body: JSON.stringify({ email, role }),
   });
   if (!res.ok) throw new Error("Failed to request OTP");
   return res.json();
 };
 
-export const verifyOtp = async (phone: string, otp: string, role: string) => {
+export const verifyOtp = async (email: string, otp: string, role: string, name?: string) => {
   const res = await fetch(`${API_URL}/auth/verify-otp`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, otp, role }),
+    body: JSON.stringify({ email, otp, role, name }),
   });
   
   if (!res.ok) {

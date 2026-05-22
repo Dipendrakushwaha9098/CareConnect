@@ -3,6 +3,20 @@ import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { PrismaClient } from "@prisma/client";
+import dotenv from "dotenv";
+import nodemailer from "nodemailer";
+
+dotenv.config();
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT || "587"),
+  secure: false, // true for 465, false for other ports
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 const app = express();
 const httpServer = createServer(app);
@@ -21,50 +35,65 @@ app.use(express.json());
 const otpStore: Record<string, string> = {};
 
 // Auth APIs
-app.post("/api/auth/request-otp", (req, res) => {
-  const { phone } = req.body;
-  if (!phone) {
-    return res.status(400).json({ error: "Phone number is required" });
+app.post("/api/auth/request-otp", async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Email address is required" });
   }
 
-  // Hardcoded to 123456 for local development so it doesn't need real SMS
-  const otp = "123456";
-  otpStore[phone] = otp;
+  // Generate a random 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  otpStore[email] = otp;
 
-  // In a real application, connect to Twilio/AWS SNS etc.
-  console.log(`======== DEV SYSTEM MESSAGE ========`);
-  console.log(`[OTP] Mock SMS Sent! OTP for phone ${phone}: ${otp}`);
-  console.log(`====================================`);
+  try {
+    const info = await transporter.sendMail({
+      from: process.env.SMTP_FROM || '"CareConnect" <no-reply@careconnect.com>',
+      to: email,
+      subject: "CareConnect Verification Code",
+      text: `Your CareConnect verification code is: ${otp}`,
+      html: `<b>Your CareConnect verification code is:</b> <h2 style="color:#2563eb;letter-spacing:4px;">${otp}</h2>`,
+    });
 
-  res.json({ success: true, message: "OTP sent successfully" });
+    console.log(`======== DEV SYSTEM MESSAGE ========`);
+    console.log(`[OTP] Real Email Sent via Nodemailer! Message ID: ${info.messageId}`);
+    console.log(`[OTP] The OTP is: ${otp}`);
+    console.log(`====================================`);
+
+    res.json({ success: true, message: "OTP sent successfully" });
+  } catch (error: any) {
+    console.error("Nodemailer Error:", error);
+    res.status(500).json({ error: "Failed to send OTP via Email. " + error.message });
+  }
 });
 
 app.post("/api/auth/verify-otp", async (req, res) => {
-  const { phone, otp, role = "patient" } = req.body;
-  if (!phone || !otp) {
-    return res.status(400).json({ error: "Phone number and OTP are required" });
+  const { email, otp, role = "patient", name } = req.body;
+  if (!email || !otp) {
+    return res.status(400).json({ error: "Email and OTP are required" });
   }
 
-  const validOtp = otpStore[phone];
+  const validOtp = otpStore[email];
   if (validOtp && validOtp === otp) {
     // Clear the OTP
-    delete otpStore[phone];
+    delete otpStore[email];
 
     // Check if user exists in Database
     try {
       let user = await prisma.user.findUnique({
-        where: { phone }
+        where: { email }
       });
 
       const isDoctor = role === "doctor";
 
       // Auto-register if not found
       if (!user) {
+        const uniqueSuffix = Math.floor(1000 + Math.random() * 9000);
+        const finalName = name && name.trim() !== "" ? name : (isDoctor ? "Dr. " + uniqueSuffix : "Patient " + uniqueSuffix);
         user = await prisma.user.create({
           data: {
-            phone,
+            email,
             role,
-            name: isDoctor ? "Dr. " + phone.substring(phone.length - 4) : "Patient " + phone.substring(phone.length - 4),
+            name: finalName,
           }
         });
 
@@ -77,7 +106,7 @@ app.post("/api/auth/verify-otp", async (req, res) => {
               age: 30, // Default mock data
               gender: "Not specified",
               dosha: "Not evaluated",
-              phone: user.phone,
+              email: user.email,
             }
           });
         }
@@ -88,8 +117,8 @@ app.post("/api/auth/verify-otp", async (req, res) => {
         user: {
           id: user.id,
           name: user.name,
-          phone: user.phone,
-          email: `${user.id.substring(0, 5)}@clinic.com`,
+          email: user.email,
+          phone: user.phone || "",
           role: user.role,
         }
       });
@@ -165,40 +194,130 @@ app.delete("/api/appointments/:id", async (req, res) => {
 });
 
 app.post("/api/appointments", async (req, res) => {
-  const { patientId, ...data } = req.body;
-  const newAppointment = await prisma.appointment.create({
-    data: {
-      ...data,
-      patient: {
-        connect: { id: patientId },
+  const { patientId, patientName, patientPhone, ...data } = req.body;
+  
+  try {
+    let resolvedPatientId = patientId;
+    
+    // If patientId is not provided but patientName is, find or create the patient
+    if (!resolvedPatientId && patientName) {
+      let existingPatient = await prisma.patient.findFirst({
+        where: {
+          OR: [
+            { name: patientName },
+            { phone: patientPhone || undefined }
+          ]
+        }
+      });
+
+      if (!existingPatient) {
+        existingPatient = await prisma.patient.create({
+          data: {
+            name: patientName,
+            phone: patientPhone || "Not specified",
+            age: 30,
+            gender: "Not specified",
+            dosha: "Not evaluated",
+            status: "Active"
+          }
+        });
+      }
+      resolvedPatientId = existingPatient.id;
+    } else if (resolvedPatientId && patientName) {
+      // Update the existing patient's name and phone based on the booking form
+      await prisma.patient.update({
+        where: { id: resolvedPatientId },
+        data: {
+          name: patientName,
+          ...(patientPhone && { phone: patientPhone })
+        }
+      });
+    }
+
+    if (!resolvedPatientId) {
+      return res.status(400).json({ error: "Patient ID or Patient Name is required" });
+    }
+
+    const newAppointment = await prisma.appointment.create({
+      data: {
+        ...data,
+        status: data.status || "Pending", // Default new appointments to Pending
+        patient: {
+          connect: { id: resolvedPatientId },
+        },
       },
-    },
-    include: { patient: true },
-  });
+      include: { patient: true },
+    });
 
-  const formatted = {
-    id: newAppointment.id,
-    patient: newAppointment.patient.name,
-    patientId: newAppointment.patientId,
-    therapy: newAppointment.therapy,
-    date: newAppointment.date,
-    time: newAppointment.time,
-    status: newAppointment.status,
-  };
+    const formatted = {
+      id: newAppointment.id,
+      patient: newAppointment.patient.name,
+      patientId: newAppointment.patientId,
+      therapy: newAppointment.therapy,
+      date: newAppointment.date,
+      time: newAppointment.time,
+      status: newAppointment.status,
+    };
 
-  io.emit("appointmentCreated", formatted);
+    io.emit("appointmentCreated", formatted);
 
-  // Auto create a notification for scheduling
-  const notif = await prisma.notification.create({
-    data: {
-      title: "New Appointment",
-      message: `Appointment scheduled for ${formatted.patient} on ${formatted.date} at ${formatted.time}`,
-      type: "info",
-    },
-  });
-  io.emit("notificationCreated", notif);
+    // Auto create a notification for scheduling
+    const notif = await prisma.notification.create({
+      data: {
+        title: "New Appointment Request",
+        message: `New booking request for ${formatted.patient} on ${formatted.date} at ${formatted.time}`,
+        type: "info",
+      },
+    });
+    io.emit("notificationCreated", notif);
 
-  res.status(201).json(formatted);
+    res.status(201).json(formatted);
+  } catch (err: any) {
+    console.error("Failed to create appointment:", err);
+    res.status(500).json({ error: "Failed to create appointment: " + err.message });
+  }
+});
+
+app.put("/api/appointments/:id", async (req, res) => {
+  const { date, time, status } = req.body;
+  try {
+    const updatedAppointment = await prisma.appointment.update({
+      where: { id: req.params.id },
+      data: {
+        date,
+        time,
+        status,
+      },
+      include: { patient: true },
+    });
+
+    const formatted = {
+      id: updatedAppointment.id,
+      patient: updatedAppointment.patient.name,
+      patientId: updatedAppointment.patientId,
+      therapy: updatedAppointment.therapy,
+      date: updatedAppointment.date,
+      time: updatedAppointment.time,
+      status: updatedAppointment.status,
+    };
+
+    io.emit("appointmentUpdated", formatted);
+
+    // Create a notification for update
+    const notif = await prisma.notification.create({
+      data: {
+        title: "Appointment Approved/Updated",
+        message: `Appointment for ${formatted.patient} is now scheduled for ${formatted.date} at ${formatted.time} (${formatted.status})`,
+        type: "info",
+      },
+    });
+    io.emit("notificationCreated", notif);
+
+    res.json(formatted);
+  } catch (err: any) {
+    console.error("Failed to update appointment:", err);
+    res.status(500).json({ error: "Failed to update appointment: " + err.message });
+  }
 });
 
 // Notifications API

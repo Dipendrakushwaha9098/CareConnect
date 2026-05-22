@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { ArrowRight, Leaf, Shield, Zap, Heart, Users, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AnimatedBackground3D } from "@/components/AnimatedBackground3D";
 
 
 const features = [
@@ -55,11 +54,6 @@ const itemVariants = {
 export default function Index() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FBF7F0] to-[#F5F1EB] overflow-hidden">
-      {/* 3D Background */}
-      <div className="fixed inset-0 opacity-10 pointer-events-none">
-        <AnimatedBackground3D />
-      </div>
-
       {/* Content */}
       <div className="relative z-10">
         {/* Navigation */}

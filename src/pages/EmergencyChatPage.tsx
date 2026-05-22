@@ -21,13 +21,13 @@ export default function EmergencyChatPage() {
       id: "sys-1",
       role: "system",
       text: "You are connected to the CareConnect Support Hub.",
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
     },
     {
       id: "ai-1",
       role: "ai",
       text: `Hello ${user?.name || "Patient"}. All our human doctors are currently assisting other patients. I am the AI Care Assistant. How can I help you today?`,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
     }
   ]);
   const [inputText, setInputText] = useState("");
@@ -50,7 +50,7 @@ export default function EmergencyChatPage() {
       id: `usr-${Date.now()}`,
       role: "user",
       text: inputText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
     };
 
     setMessages((prev) => [...prev, newUserMsg]);
@@ -78,7 +78,7 @@ export default function EmergencyChatPage() {
           id: `ai-${Date.now()}`,
           role: "ai",
           text: aiResponseText,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
         }
       ]);
       setIsAiTyping(false);
