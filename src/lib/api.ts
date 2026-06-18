@@ -1,7 +1,28 @@
 const API_URL = "http://localhost:3001/api";
 
+const getHeaders = (isPatchOrDelete = false) => {
+  const stored = localStorage.getItem("careConnect_user");
+  const headers: Record<string, string> = {};
+  if (!isPatchOrDelete) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (stored) {
+    try {
+      const user = JSON.parse(stored);
+      if (user.token) {
+        headers["Authorization"] = `Bearer ${user.token}`;
+      }
+    } catch (e) {
+      console.error("Error reading token from localStorage", e);
+    }
+  }
+  return headers;
+};
+
 export const fetchPatients = async () => {
-  const res = await fetch(`${API_URL}/patients`);
+  const res = await fetch(`${API_URL}/patients`, {
+    headers: getHeaders()
+  });
   if (!res.ok) throw new Error("Failed to fetch patients");
   return res.json();
 };
@@ -9,7 +30,7 @@ export const fetchPatients = async () => {
 export const createPatient = async (data: any) => {
   const res = await fetch(`${API_URL}/patients`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to create patient");
@@ -19,14 +40,16 @@ export const createPatient = async (data: any) => {
 export const deletePatient = async (id: string) => {
   const res = await fetch(`${API_URL}/patients/${id}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: getHeaders(true),
   });
   if (!res.ok) throw new Error("Failed to delete patient");
   return res.json();
 };
 
 export const fetchAppointments = async () => {
-  const res = await fetch(`${API_URL}/appointments`);
+  const res = await fetch(`${API_URL}/appointments`, {
+    headers: getHeaders()
+  });
   if (!res.ok) throw new Error("Failed to fetch appointments");
   return res.json();
 };
@@ -34,7 +57,7 @@ export const fetchAppointments = async () => {
 export const createAppointment = async (data: any) => {
   const res = await fetch(`${API_URL}/appointments`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to create appointment");
@@ -44,7 +67,7 @@ export const createAppointment = async (data: any) => {
 export const deleteAppointment = async (id: string) => {
   const res = await fetch(`${API_URL}/appointments/${id}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: getHeaders(true),
   });
   if (!res.ok) throw new Error("Failed to delete appointment");
   return res.json();
@@ -53,7 +76,7 @@ export const deleteAppointment = async (id: string) => {
 export const updateAppointment = async (id: string, data: any) => {
   const res = await fetch(`${API_URL}/appointments/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: getHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to update appointment");
@@ -61,7 +84,9 @@ export const updateAppointment = async (id: string, data: any) => {
 };
 
 export const fetchNotifications = async () => {
-  const res = await fetch(`${API_URL}/notifications`);
+  const res = await fetch(`${API_URL}/notifications`, {
+    headers: getHeaders()
+  });
   if (!res.ok) throw new Error("Failed to fetch notifications");
   return res.json();
 };
@@ -69,6 +94,7 @@ export const fetchNotifications = async () => {
 export const markNotificationRead = async (id: string) => {
   const res = await fetch(`${API_URL}/notifications/${id}/read`, {
     method: "PATCH",
+    headers: getHeaders(true),
   });
   if (!res.ok) throw new Error("Failed to mark notification read");
   return res.json();
@@ -99,7 +125,9 @@ export const verifyOtp = async (email: string, otp: string, role: string, name?:
 };
 
 export const fetchTreatments = async () => {
-  const res = await fetch(`${API_URL}/treatments`);
+  const res = await fetch(`${API_URL}/treatments`, {
+    headers: getHeaders()
+  });
   if (!res.ok) throw new Error("Failed to fetch treatments");
   return res.json();
 };
@@ -107,7 +135,7 @@ export const fetchTreatments = async () => {
 export const createTreatment = async (data: any) => {
   const res = await fetch(`${API_URL}/treatments`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to create treatment");
@@ -115,7 +143,9 @@ export const createTreatment = async (data: any) => {
 };
 
 export const fetchPrescriptions = async () => {
-  const res = await fetch(`${API_URL}/prescriptions`);
+  const res = await fetch(`${API_URL}/prescriptions`, {
+    headers: getHeaders()
+  });
   if (!res.ok) throw new Error("Failed to fetch prescriptions");
   return res.json();
 };
@@ -123,7 +153,7 @@ export const fetchPrescriptions = async () => {
 export const createPrescription = async (data: any) => {
   const res = await fetch(`${API_URL}/prescriptions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to create prescription");
@@ -131,7 +161,9 @@ export const createPrescription = async (data: any) => {
 };
 
 export const fetchInvoices = async () => {
-  const res = await fetch(`${API_URL}/invoices`);
+  const res = await fetch(`${API_URL}/invoices`, {
+    headers: getHeaders()
+  });
   if (!res.ok) throw new Error("Failed to fetch invoices");
   return res.json();
 };
@@ -139,10 +171,9 @@ export const fetchInvoices = async () => {
 export const createInvoice = async (data: any) => {
   const res = await fetch(`${API_URL}/invoices`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to create invoice");
   return res.json();
 };
-

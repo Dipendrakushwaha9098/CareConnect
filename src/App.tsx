@@ -16,6 +16,7 @@ import NotificationsPage from "./pages/NotificationsPage";
 import SettingsPage from "./pages/SettingsPage";
 import PatientDashboardPage from "./pages/PatientDashboardPage";
 import EmergencyChatPage from "./pages/EmergencyChatPage";
+import AdvancedUtilitiesPage from "./pages/AdvancedUtilitiesPage";
 import NotFound from "./pages/NotFound";
 
 import AppLayout from "./components/AppLayout";
@@ -27,8 +28,8 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 const queryClient = new QueryClient();
 
 /* ================= PROTECTED ROUTE ================= */
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) => {
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading)
     return (
@@ -42,12 +43,19 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
+  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+    if (user.role === "patient") {
+      return <Navigate to="/patient-dashboard" replace />;
+    }
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return <>{children}</>;
 };
 
 /* ================= APP PAGE WRAPPER ================= */
-const AppPage = ({ children }: { children: React.ReactNode }) => (
-  <ProtectedRoute>
+const AppPage = ({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) => (
+  <ProtectedRoute allowedRoles={allowedRoles}>
     <AppLayout>{children}</AppLayout>
   </ProtectedRoute>
 );
@@ -63,15 +71,16 @@ const AnimatedRoutes = () => {
         <Route path="/" element={<PageTransition><LandingPage /></PageTransition>} />
         <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
 
-        <Route path="/dashboard" element={<AppPage><PageTransition><DashboardPage /></PageTransition></AppPage>} />
-        <Route path="/patient-dashboard" element={<AppPage><PageTransition><PatientDashboardPage /></PageTransition></AppPage>} />
-        <Route path="/patients" element={<AppPage><PageTransition><PatientsPage /></PageTransition></AppPage>} />
+        <Route path="/dashboard" element={<AppPage allowedRoles={["doctor", "admin"]}><PageTransition><DashboardPage /></PageTransition></AppPage>} />
+        <Route path="/patient-dashboard" element={<AppPage allowedRoles={["patient"]}><PageTransition><PatientDashboardPage /></PageTransition></AppPage>} />
+        <Route path="/patients" element={<AppPage allowedRoles={["doctor", "admin"]}><PageTransition><PatientsPage /></PageTransition></AppPage>} />
         <Route path="/appointments" element={<AppPage><PageTransition><AppointmentsPage /></PageTransition></AppPage>} />
         <Route path="/support" element={<AppPage><PageTransition><EmergencyChatPage /></PageTransition></AppPage>} />
         <Route path="/treatments" element={<AppPage><PageTransition><TreatmentsPage /></PageTransition></AppPage>} />
         <Route path="/prescriptions" element={<AppPage><PageTransition><PrescriptionsPage /></PageTransition></AppPage>} />
         <Route path="/notifications" element={<AppPage><PageTransition><NotificationsPage /></PageTransition></AppPage>} />
         <Route path="/settings" element={<AppPage><PageTransition><SettingsPage /></PageTransition></AppPage>} />
+        <Route path="/advanced-tools" element={<AppPage allowedRoles={["doctor", "admin"]}><PageTransition><AdvancedUtilitiesPage /></PageTransition></AppPage>} />
 
         <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
       </Routes>

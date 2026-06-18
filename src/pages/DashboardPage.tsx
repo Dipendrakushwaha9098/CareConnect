@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
-import { useState, useMemo, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Users,
   CalendarDays,
@@ -20,7 +21,9 @@ import {
   TrendingDown,
   AlertCircle,
   Brain,
-  CheckCircle2
+  CheckCircle2,
+  Video,
+  HeartPulse
 } from "lucide-react";
 import {
   AreaChart,
@@ -40,6 +43,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { cn, formatTime12Hour } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 // ✅ TYPES
 type Patient = {
@@ -52,7 +56,7 @@ type Appointment = {
   id: string;
   patient: string;
   therapy?: string;
-  status?: "Ongoing" | "Completed" | "Scheduled";
+  status?: "Ongoing" | "Completed" | "Scheduled" | "Pending" | "Cancel Requested";
   amount?: number;
   time?: string;
   date?: string;
@@ -80,8 +84,10 @@ const itemVariants = {
 };
 
 export default function DashboardPage() {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const isPatient = user?.role === "patient";
   const [tickerIndex, setTickerIndex] = useState(0);
 
   const systemStatus = [
@@ -97,6 +103,71 @@ export default function DashboardPage() {
     }, 5000);
     return () => clearInterval(timer);
   }, []);
+
+  // ── Telemedicine Active Calls State for Doctor ──
+  interface TelemedicineSession {
+    id: string;
+    patientName: string;
+    doctorName: string;
+    roomName: string;
+    createdAt: string;
+  }
+  const [activeCalls, setActiveCalls] = useState<TelemedicineSession[]>([]);
+  const [isDoctorCallActive, setIsDoctorCallActive] = useState(false);
+  const [doctorRoomName, setDoctorRoomName] = useState("");
+  const [doctorTargetPatientName, setDoctorTargetPatientName] = useState("");
+
+  const fetchActiveCalls = useCallback(() => {
+    if (isPatient) return; // Patients don't poll calls from here
+    fetch("http://localhost:3001/api/telemedicine-sessions")
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setActiveCalls(data);
+        }
+      })
+      .catch(err => console.error("Error fetching telemedicine calls:", err));
+  }, [isPatient]);
+
+  useEffect(() => {
+    if (isPatient) return;
+    fetchActiveCalls();
+    const interval = setInterval(fetchActiveCalls, 4000); // Poll every 4 seconds for fresh patient calls!
+    return () => clearInterval(interval);
+  }, [isPatient, fetchActiveCalls]);
+
+  const handleDoctorAcceptCall = async (call: TelemedicineSession) => {
+    try {
+      await fetch(`http://localhost:3001/api/telemedicine/call/${call.roomName}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doctorName: user?.name || "Dr. Alexander" })
+      });
+      setDoctorRoomName(call.roomName);
+      setDoctorTargetPatientName(call.patientName);
+      setIsDoctorCallActive(true);
+      toast.success(`📞 Connecting securely to telehealth call with Patient ${call.patientName}!`);
+    } catch (err) {
+      console.error("Failed to notify patient of call acceptance:", err);
+      // Fallback
+      setDoctorRoomName(call.roomName);
+      setDoctorTargetPatientName(call.patientName);
+      setIsDoctorCallActive(true);
+    }
+  };
+
+  const handleDoctorDisconnectCall = async () => {
+    try {
+      await fetch(`http://localhost:3001/api/telemedicine/call/${doctorRoomName}`, {
+        method: "DELETE"
+      });
+    } catch (err) {
+      console.error("Failed to disconnect call cleanly:", err);
+    } finally {
+      setIsDoctorCallActive(false);
+      toast.success("Telehealth session closed cleanly.");
+    }
+  };
 
   // ✅ FETCH DATA
   const { data: patients = [], isLoading: isLoadingPatients } =
@@ -119,15 +190,29 @@ export default function DashboardPage() {
   });
 
   const { socket } = useSocket();
-  const isPatient = user?.role === "patient";
 
   useEffect(() => {
     if (!socket) return;
 
     const handleNotif = () => refetchNotifications();
-    
-    socket.on("notificationCreated", handleNotif);
-    socket.on("appointmentUpdated", (updatedAppt: any) => {
+    const handleTelemedicineUpdate = () => fetchActiveCalls();
+
+    const handleCallEnded = (data: { roomName: string }) => {
+      if (data.roomName === doctorRoomName) {
+        setIsDoctorCallActive(false);
+        toast.info("The live telehealth consultation has ended.");
+      }
+    };
+
+    const handleAppointmentCreated = () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      handleNotif();
+    };
+
+    const handleAppointmentUpdated = (updatedAppt: any) => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
       handleNotif();
       // Live Toast alert for the patient
       if (isPatient && updatedAppt.status === "Scheduled") {
@@ -135,13 +220,65 @@ export default function DashboardPage() {
           duration: 10000,
         });
       }
-    });
+    };
+
+    const handleAppointmentDeleted = () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      handleNotif();
+    };
+    
+    socket.on("notificationCreated", handleNotif);
+    socket.on("appointmentCreated", handleAppointmentCreated);
+    socket.on("appointmentUpdated", handleAppointmentUpdated);
+    socket.on("appointmentDeleted", handleAppointmentDeleted);
+    socket.on("telemedicineSessionCreated", handleTelemedicineUpdate);
+    socket.on("telemedicineSessionsUpdated", handleTelemedicineUpdate);
+    socket.on("telemedicineSessionEnded", handleCallEnded);
 
     return () => {
       socket.off("notificationCreated", handleNotif);
-      socket.off("appointmentUpdated");
+      socket.off("appointmentCreated", handleAppointmentCreated);
+      socket.off("appointmentUpdated", handleAppointmentUpdated);
+      socket.off("appointmentDeleted", handleAppointmentDeleted);
+      socket.off("telemedicineSessionCreated", handleTelemedicineUpdate);
+      socket.off("telemedicineSessionsUpdated", handleTelemedicineUpdate);
+      socket.off("telemedicineSessionEnded", handleCallEnded);
     };
-  }, [socket, isPatient, refetchNotifications]);
+  }, [socket, isPatient, refetchNotifications, fetchActiveCalls, doctorRoomName, queryClient]);
+
+  useEffect(() => {
+    if (!isDoctorCallActive || !doctorRoomName) return;
+
+    let api: any;
+    const timer = setTimeout(() => {
+      const container = document.getElementById("jitsi-doctor-container");
+      if (container && (window as any).JitsiMeetExternalAPI) {
+        api = new (window as any).JitsiMeetExternalAPI("meet.jit.si", {
+          roomName: doctorRoomName,
+          parentNode: container,
+          width: "100%",
+          height: "100%",
+          configOverwrite: {
+            prejoinPageEnabled: false,
+            startWithAudioMuted: false,
+            startWithVideoMuted: false,
+          },
+          interfaceConfigOverwrite: {
+            SHOW_JITSI_WATERMARK: false,
+            SHOW_BRAND_WATERMARK: false,
+          }
+        });
+      }
+    }, 150);
+
+    return () => {
+      clearTimeout(timer);
+      if (api) {
+        api.dispose();
+      }
+    };
+  }, [isDoctorCallActive, doctorRoomName]);
 
   const systemNotifications = useMemo(() => {
     // If patient, only show notifications that match their name
@@ -161,6 +298,10 @@ export default function DashboardPage() {
 
   const ongoingCount = useMemo(() => {
     return appointments.filter(a => a?.status === "Ongoing").length;
+  }, [appointments]);
+
+  const pendingCount = useMemo(() => {
+    return appointments.filter(a => a?.status === "Pending").length;
   }, [appointments]);
 
   const upcomingNotifications = useMemo(() => {
@@ -214,7 +355,7 @@ export default function DashboardPage() {
         if (!p.createdAt) return false;
         return new Date(p.createdAt).getMonth() === index;
       }).length;
-      return { month, patients: count || Math.floor(Math.random() * 20) + 10 }; // Fallback for realistic visualization
+      return { month, patients: count }; // Only show actual patients count
     });
   }, [patients]);
 
@@ -224,16 +365,6 @@ export default function DashboardPage() {
       const therapy = a.therapy || "General";
       map[therapy] = (map[therapy] || 0) + 1;
     });
-    // Add realistic defaults if empty
-    if (Object.keys(map).length === 0) {
-      return [
-        { name: "Cardiology", count: 45 },
-        { name: "Neurology", count: 32 },
-        { name: "Pediatrics", count: 28 },
-        { name: "Ayurveda", count: 54 },
-        { name: "CBT", count: 19 }
-      ];
-    }
     return Object.entries(map)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
@@ -244,32 +375,32 @@ export default function DashboardPage() {
     {
       icon: Users,
       label: "Active Patients",
-      value: isLoadingPatients ? "..." : patients.length || 1248,
-      change: "+12.5%",
+      value: isLoadingPatients ? "..." : patients.length,
+      change: patients.length > 0 ? "+100%" : "0%",
       color: "blue",
       trend: "up"
     },
     {
       icon: CalendarDays,
       label: "Appointments",
-      value: isLoadingAppointments ? "..." : appointments.length || 86,
-      change: "+8.3%",
+      value: isLoadingAppointments ? "..." : appointments.length,
+      change: appointments.length > 0 ? "+100%" : "0%",
       color: "teal",
       trend: "up"
     },
     {
       icon: Activity,
       label: "Avg. Pulse Rate",
-      value: "72 bpm",
-      change: "-2.1%",
+      value: patients.length > 0 ? "72 bpm" : "0 bpm",
+      change: "0%",
       color: "purple",
-      trend: "down"
+      trend: "up"
     },
     {
       icon: IndianRupee,
       label: "Institutional Revenue",
-      value: isLoadingAppointments ? "..." : `₹${(totalRevenue || 452000).toLocaleString()}`,
-      change: "+18.2%",
+      value: isLoadingAppointments ? "..." : `₹${totalRevenue.toLocaleString()}`,
+      change: totalRevenue > 0 ? "+100%" : "0%",
       color: "indigo",
       trend: "up"
     },
@@ -309,15 +440,15 @@ export default function DashboardPage() {
       <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-end justify-between gap-8">
         <div>
           <div className="flex items-center gap-2 text-blue-600 font-black tracking-widest uppercase text-[10px] mb-3">
-             <Stethoscope className="w-3 h-3" /> Management Dashboard
+             <HeartPulse className="w-3 h-3 text-blue-600 animate-pulse" /> CareConnect · Management Dashboard
           </div>
           <h1 className="text-5xl font-black text-slate-900 tracking-tight mb-3">
             Clinical Overview
           </h1>
           <p className="text-slate-500 font-bold flex items-center gap-2 text-lg">
-            Welcome back, <span className="text-blue-600">Dr. {user?.name || "Alexander"}</span> 👋 
+            Welcome back, <span className="text-blue-600">Dr. {user?.name ? user.name.replace(/^(Dr\.\s*)+/i, "") : "Alexander"}</span> 👋 
             <span className="w-1.5 h-1.5 bg-slate-300 rounded-full mx-2" /> 
-            You have {ongoingCount || 7} critical cases requiring review.
+            You have {pendingCount} pending booking request{pendingCount === 1 ? "" : "s"} and {ongoingCount} ongoing session{ongoingCount === 1 ? "" : "s"}.
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -365,6 +496,34 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      {/* ── PENDING BOOKING REQUESTS ALERT FOR DOCTORS ── */}
+      {!isPatient && pendingCount > 0 && (
+        <motion.div variants={itemVariants} className="premium-card p-8 bg-amber-50 border border-amber-200 text-amber-900 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-amber-100/30 blur-[80px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center">
+                <CalendarDays className="w-6 h-6 text-amber-600 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black tracking-tight text-amber-900">Pending Booking Requests</h3>
+                <p className="text-xs text-amber-700 font-semibold mt-0.5">
+                  There are {pendingCount} new appointment requests waiting for clinical review and slot confirmation.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={() => navigate("/appointments")}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-xs h-12 px-6 self-start md:self-auto shadow-md shadow-amber-200"
+            >
+              Review & Approve Requests
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
+
+      {/* ── Care AI Insights & Patient Flow Chart ── */}
       <div className="grid lg:grid-cols-3 gap-10">
         {/* ── Care AI Insights ── */}
         <motion.div variants={itemVariants} className="lg:col-span-1 premium-card p-10 bg-slate-900 text-white relative overflow-hidden group">
@@ -467,25 +626,25 @@ export default function DashboardPage() {
                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-lg">Real-time</span>
             </h3>
             <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={therapyData}>
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10, fontWeight: 800, fill: "#94a3b8" }}
-                  />
-                  <RechartsTooltip 
-                    cursor={{ fill: "rgba(241, 245, 249, 0.5)" }}
-                    contentStyle={{ borderRadius: "20px", border: "none", boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}
-                  />
-                  <Bar dataKey="count" radius={[14, 14, 0, 0]} animationDuration={2000}>
-                    {therapyData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={["#2563eb", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899"][index % 5]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+               <ResponsiveContainer width="100%" height="100%">
+                 <BarChart data={therapyData}>
+                   <XAxis 
+                     dataKey="name" 
+                     axisLine={false} 
+                     tickLine={false} 
+                     tick={{ fontSize: 10, fontWeight: 800, fill: "#94a3b8" }}
+                   />
+                   <RechartsTooltip 
+                     cursor={{ fill: "transparent" }}
+                     contentStyle={{ borderRadius: "20px", border: "none", boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }}
+                   />
+                   <Bar dataKey="count" radius={[14, 14, 0, 0]} animationDuration={2000}>
+                     {therapyData.map((entry, index) => (
+                       <Cell key={`cell-${index}`} fill={["#2563eb", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899"][index % 5]} />
+                     ))}
+                   </Bar>
+                 </BarChart>
+               </ResponsiveContainer>
             </div>
          </motion.div>
 
@@ -558,8 +717,9 @@ export default function DashboardPage() {
                 )
               )}
             </div>
-          </motion.div>
+         </motion.div>
       </div>
+
     </motion.div>
   );
 }

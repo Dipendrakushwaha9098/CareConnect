@@ -60,11 +60,11 @@ export default function PrescriptionsPage() {
       <div className="relative z-10 px-4 sm:px-6 lg:px-8 py-6 space-y-8">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">Prescriptions & Billing</h1>
-          <p className="text-sm text-muted-foreground mt-1">Digital prescriptions and invoices</p>
+          <h1 className="font-heading text-3xl font-black text-slate-900 tracking-tight">Prescriptions & Billing</h1>
+          <p className="text-sm text-slate-400 font-bold mt-1">Digital prescriptions and billing history</p>
         </div>
         {!isPatient && (
-          <Button className="w-full sm:w-auto flex gradient-sage text-primary-foreground border-0 btn-ripple">
+          <Button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white rounded-2xl px-6 h-12 shadow-xl shadow-blue-100 font-black flex items-center justify-center transition-all btn-magnetic">
             <Plus className="w-4 h-4 mr-2" /> Create New
           </Button>
         )}
@@ -89,20 +89,20 @@ export default function PrescriptionsPage() {
                 <motion.div
                   key={rx.id}
                   variants={itemVariants}
-                  className="glass-card-hover p-4 flex flex-col sm:flex-row sm:items-center gap-4 bg-white"
+                  className="glass-card-hover p-5 flex flex-col sm:flex-row sm:items-center gap-4 bg-white border border-slate-100/60 shadow-sm"
                 >
                   <div className="flex items-center gap-4 w-full sm:w-auto">
-                    <div className="w-10 h-10 rounded-xl gradient-sage flex items-center justify-center flex-shrink-0">
-                      <FileText className="w-5 h-5 text-primary-foreground" />
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-100">
+                      <FileText className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex-1 min-w-0 sm:hidden">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium text-foreground text-sm">{rx.id.substring(0,8).toUpperCase()}</span>
-                        <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 ${rx.status === "Active" ? "bg-emerald-100 text-emerald-800" : "bg-muted text-muted-foreground"}`}>
+                        <span className="font-black text-slate-800 text-sm">{rx.id.substring(0,8).toUpperCase()}</span>
+                        <Badge className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 ${rx.status === "Active" ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-muted text-muted-foreground"}`}>
                           {rx.status}
                         </Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">{rx.patient} • {rx.date}</p>
+                      <p className="text-xs text-slate-500 font-bold mt-1 truncate">{rx.patient} • {rx.date}</p>
                     </div>
                   </div>
 
@@ -158,21 +158,21 @@ export default function PrescriptionsPage() {
                 <motion.div
                   key={inv.id}
                   variants={itemVariants}
-                  className="glass-card-hover p-4 flex flex-col sm:flex-row sm:items-center gap-4 bg-white text-left"
+                  className="glass-card-hover p-5 flex flex-col sm:flex-row sm:items-center gap-4 bg-white text-left border border-slate-100/60 shadow-sm"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-orange-50 flex items-center justify-center flex-shrink-0 shadow-md shadow-orange-100/40">
                       <IndianRupee className="w-5 h-5 text-orange-600" />
                     </div>
                     <div className="flex-1 min-w-0 sm:hidden">
-                      <div className="font-medium text-foreground text-sm">{inv.id.substring(0,8).toUpperCase()} — {inv.patient}</div>
-                      <p className="text-xs text-muted-foreground">{inv.date}</p>
+                      <div className="font-black text-slate-800 text-sm">{inv.id.substring(0,8).toUpperCase()} — {inv.patient}</div>
+                      <p className="text-xs text-slate-400 font-bold mt-1">{inv.date}</p>
                     </div>
                   </div>
                   
                   <div className="flex-1 min-w-0 hidden sm:block">
-                    <div className="font-medium text-foreground text-sm">{inv.id.substring(0,8).toUpperCase()} — {inv.patient}</div>
-                    <p className="text-xs text-muted-foreground">{inv.date}</p>
+                    <div className="font-black text-slate-800 text-base">{inv.id.substring(0,8).toUpperCase()} — {inv.patient}</div>
+                    <p className="text-xs text-slate-400 font-bold mt-0.5">{inv.date}</p>
                   </div>
 
                   <div className="flex flex-row sm:flex-row items-center justify-between sm:justify-end gap-3 mt-2 sm:mt-0">

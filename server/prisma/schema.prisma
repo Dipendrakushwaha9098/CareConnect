@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -18,12 +18,12 @@ model User {
   role      String   @default("patient") // 'patient' | 'doctor'
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  patient   Patient?
+  patients  Patient[]
 }
 
 model Patient {
   id             String        @id @default(uuid())
-  userId         String?       @unique
+  userId         String?
   user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   name           String
   age            Int
@@ -42,15 +42,16 @@ model Patient {
 }
 
 model Appointment {
-  id        String   @id @default(uuid())
-  patientId String
-  therapy   String
-  date      String // Format YYYY-MM-DD
-  time      String // Format HH:MM AM/PM
-  notes     String?
-  status    String   @default("Scheduled")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  patientId    String
+  therapy      String
+  date         String // Format YYYY-MM-DD
+  time         String // Format HH:MM AM/PM
+  notes        String?
+  status       String   @default("Scheduled")
+  cancelReason String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
   patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
@@ -95,4 +96,39 @@ model Invoice {
   paid      Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model MedicineReminder {
+  id        String   @id @default(uuid())
+  patientId String?
+  name      String
+  time      String   // E.g. "08:00 AM"
+  freq      String   // E.g. "Once daily"
+  status    String   @default("Active")
+  createdAt DateTime @default(now())
+}
+
+model SymptomCheck {
+  id         String   @id @default(uuid())
+  patientId  String?
+  symptoms   String
+  diagnosis  String
+  urgency    String
+  specialist String
+  createdAt  DateTime @default(now())
+}
+
+model TelemedicineSession {
+  id          String   @id @default(uuid())
+  patientName String
+  doctorName  String
+  roomName    String
+  createdAt   DateTime @default(now())
+}
+
+model VoiceConsultationNote {
+  id          String   @id @default(uuid())
+  patientName String
+  notes       String
+  createdAt   DateTime @default(now())
 }

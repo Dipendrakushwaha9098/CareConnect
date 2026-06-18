@@ -23,7 +23,7 @@ import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { CalendarDays, AlertTriangle } from "lucide-react"; // Import extra icons needed for approvals & busy slots
 
-type AppointmentStatus = "Pending" | "Scheduled" | "Ongoing" | "Completed";
+type AppointmentStatus = "Pending" | "Scheduled" | "Ongoing" | "Completed" | "Cancel Requested";
 
 type Appointment = {
   id: string;
@@ -34,6 +34,7 @@ type Appointment = {
   time: string;
   status: AppointmentStatus;
   notes?: string;
+  cancelReason?: string | null;
 };
 
 const STATUS_COLORS: Record<AppointmentStatus, string> = {
@@ -41,6 +42,7 @@ const STATUS_COLORS: Record<AppointmentStatus, string> = {
   Scheduled: "bg-blue-100 text-blue-800 border border-blue-200",
   Ongoing: "bg-green-100 text-green-800 border border-green-200",
   Completed: "bg-gray-100 text-gray-800 border border-gray-200",
+  "Cancel Requested": "bg-rose-100 text-rose-800 border border-rose-200",
 };
 
 const STATUS_ICONS: Record<AppointmentStatus, React.ElementType> = {
@@ -48,6 +50,7 @@ const STATUS_ICONS: Record<AppointmentStatus, React.ElementType> = {
   Scheduled: CheckCircle2,
   Ongoing: AlertCircle,
   Completed: CheckCircle2,
+  "Cancel Requested": AlertCircle,
 };
 
 export default function AppointmentsPage() {
@@ -80,7 +83,7 @@ export default function AppointmentsPage() {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
       queryClient.invalidateQueries({ queryKey: ["patients"] });
       setDialogOpen(false);
-      setNewForm({ patientId: "", patientName: "", patientPhone: "", therapy: "", date: "", time: "", notes: "" });
+      setNewForm({ patientId: "", patientName: "", patientPhone: "", patientAge: "", patientGender: "", therapy: "", date: "", time: "", notes: "" });
       if (isPatient) {
         toast.success("Booking request submitted successfully!");
       } else {
@@ -124,6 +127,8 @@ export default function AppointmentsPage() {
     patientId: "",
     patientName: "",
     patientPhone: "",
+    patientAge: "",
+    patientGender: "",
     therapy: "",
     date: "",
     time: "",
@@ -131,6 +136,42 @@ export default function AppointmentsPage() {
   });
 
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  // Cancellation Request State for Patients
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [apptToCancel, setApptToCancel] = useState<string | null>(null);
+
+  const cancelRequestMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string, reason: string }) => 
+      updateAppointment(id, { status: "Cancel Requested", cancelReason: reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      setCancelDialogOpen(false);
+      setCancelReason("");
+      setApptToCancel(null);
+      toast.success("Cancellation request submitted to the doctor.");
+    },
+    onError: () => {
+      toast.error("Failed to request cancellation.");
+    }
+  });
+
+  const handleRequestCancelSubmit = () => {
+    if (!apptToCancel || !cancelReason.trim()) return;
+    cancelRequestMutation.mutate({ id: apptToCancel, reason: cancelReason });
+  };
+
+  const declineCancellationMutation = useMutation({
+    mutationFn: (id: string) => updateAppointment(id, { status: "Scheduled", cancelReason: null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      toast.success("Cancellation request declined. Appointment remains scheduled.");
+    },
+    onError: () => {
+      toast.error("Failed to decline cancellation.");
+    }
+  });
 
   // Approval State
   const [approvalDialog, setApprovalDialog] = useState<Appointment | null>(null);
@@ -149,11 +190,14 @@ export default function AppointmentsPage() {
   });
 
   const handleCreate = () => {
-    const finalPatientId = isPatient ? currentPatient?.id : newForm.patientId;
+    const isBookingForSelf = !newForm.patientName || newForm.patientName.trim().toLowerCase() === user?.name?.trim().toLowerCase();
+    const finalPatientId = isPatient
+      ? (isBookingForSelf ? currentPatient?.id : undefined)
+      : newForm.patientId;
     
     if (!isPatient && patientType === "new") {
-      if (!newForm.patientName || !newForm.date || !newForm.time) {
-        toast.error("Please fill patient name, phone, and preferred schedule.");
+      if (!newForm.patientName || !newForm.date || !newForm.time || !newForm.patientAge || !newForm.patientGender) {
+        toast.error("Please fill patient name, phone, age, gender, and preferred schedule.");
         return;
       }
     } else if (!isPatient && patientType === "existing") {
@@ -162,11 +206,10 @@ export default function AppointmentsPage() {
         return;
       }
     } else {
-      // isPatient
       const formName = newForm.patientName || user?.name;
       const formPhone = newForm.patientPhone || user?.phone;
-      if (!formName || !formPhone || !newForm.date || !newForm.time) {
-        toast.error("Please fill your name, phone number, and preferred schedule.");
+      if (!formName || !formPhone || !newForm.date || !newForm.time || !newForm.patientAge || !newForm.patientGender) {
+        toast.error("Please fill your name, phone number, age, gender, and preferred schedule.");
         return;
       }
     }
@@ -175,6 +218,8 @@ export default function AppointmentsPage() {
       patientId: patientType === "new" ? undefined : finalPatientId,
       patientName: isPatient ? (newForm.patientName || user?.name) : (patientType === "new" ? newForm.patientName : undefined),
       patientPhone: isPatient ? (newForm.patientPhone || user?.phone) : (patientType === "new" ? newForm.patientPhone : undefined),
+      patientAge: newForm.patientAge ? parseInt(newForm.patientAge, 10) : undefined,
+      patientGender: newForm.patientGender,
       therapy: newForm.therapy || "General Appointment",
       date: newForm.date,
       time: newForm.time,
@@ -196,6 +241,10 @@ export default function AppointmentsPage() {
   };
 
   const handleDelete = (id: string) => {
+    if (isPatient) {
+      toast.error("Patients are not authorized to delete appointments directly. Please request cancellation instead.");
+      return;
+    }
     deleteMutation.mutate(id);
   };
 
@@ -287,30 +336,72 @@ export default function AppointmentsPage() {
                           value={newForm.patientPhone}
                           onChange={(e) => setNewForm({ ...newForm, patientPhone: e.target.value })}
                         />
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input
+                            placeholder="Age *"
+                            type="number"
+                            value={newForm.patientAge}
+                            onChange={(e) => setNewForm({ ...newForm, patientAge: e.target.value })}
+                          />
+                          <Select onValueChange={(v) => setNewForm({ ...newForm, patientGender: v })} value={newForm.patientGender}>
+                            <SelectTrigger className="bg-white"><SelectValue placeholder="Gender *" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Male">Male</SelectItem>
+                              <SelectItem value="Female">Female</SelectItem>
+                              <SelectItem value="Other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     )}
                   </div>
                 )}
 
                 {isPatient && (
-                  <div className="grid grid-cols-2 gap-3 pb-2 mb-2 border-b border-border/30">
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">Patient Name *</label>
-                      <Input
-                        placeholder="Full Name"
-                        value={newForm.patientName ?? user?.name ?? ""}
-                        onChange={(e) => setNewForm({ ...newForm, patientName: e.target.value })}
-                        className="bg-slate-50"
-                      />
+                  <div className="space-y-3 pb-2 mb-2 border-b border-border/30">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">Patient Name *</label>
+                        <Input
+                          placeholder="Full Name"
+                          value={newForm.patientName ?? user?.name ?? ""}
+                          onChange={(e) => setNewForm({ ...newForm, patientName: e.target.value })}
+                          className="bg-slate-50"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">Phone Number *</label>
+                        <Input
+                          placeholder="Phone Number"
+                          value={newForm.patientPhone ?? user?.phone ?? ""}
+                          onChange={(e) => setNewForm({ ...newForm, patientPhone: e.target.value })}
+                          className="bg-slate-50"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">Phone Number *</label>
-                      <Input
-                        placeholder="Phone Number"
-                        value={newForm.patientPhone ?? user?.phone ?? ""}
-                        onChange={(e) => setNewForm({ ...newForm, patientPhone: e.target.value })}
-                        className="bg-slate-50"
-                      />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">Age *</label>
+                        <Input
+                          placeholder="Age"
+                          type="number"
+                          value={newForm.patientAge}
+                          onChange={(e) => setNewForm({ ...newForm, patientAge: e.target.value })}
+                          className="bg-slate-50"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500">Gender *</label>
+                        <Select onValueChange={(v) => setNewForm({ ...newForm, patientGender: v })} value={newForm.patientGender}>
+                          <SelectTrigger className="bg-slate-50"><SelectValue placeholder="Gender *" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Male">Male</SelectItem>
+                            <SelectItem value="Female">Female</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
                 )}                <div className="grid grid-cols-2 gap-3">
@@ -410,30 +501,84 @@ export default function AppointmentsPage() {
             </div>
           </div>
         )}
+        {/* Doctor View: Pending Cancellation Requests Panel */}
+        {!isPatient && appointments.filter(a => a.status === "Cancel Requested").length > 0 && (
+          <div className="bg-rose-50/50 border border-rose-100 rounded-2xl p-5 space-y-4 shadow-sm mt-4">
+            <div className="flex items-center gap-2 text-rose-800">
+              <AlertTriangle className="w-5 h-5" />
+              <h2 className="font-bold text-lg font-display">Pending Cancellation Requests ({appointments.filter(a => a.status === "Cancel Requested").length})</h2>
+            </div>
+            <p className="text-xs text-rose-700 leading-relaxed -mt-2">
+              Patients have requested to cancel the following appointment slots. Please review their reason, and then click **Approve Cancellation** to confirm or **Decline Request** to keep the appointment.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 mt-1">
+              {appointments.filter(a => a.status === "Cancel Requested").map((appt) => (
+                <div key={appt.id} className="p-4 rounded-xl border border-rose-200/60 bg-white shadow-sm flex flex-col justify-between gap-3">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <p className="font-bold text-slate-900">{appt.patient}</p>
+                      <Badge className="bg-rose-100 text-rose-800 text-[10px] uppercase font-bold tracking-wider">Cancel Requested</Badge>
+                    </div>
+                    <p className="text-sm text-slate-500 font-medium mt-1">{appt.therapy}</p>
+                    <div className="flex items-center gap-1 text-xs text-slate-400 mt-2">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>{appt.date} at {formatTime12Hour(appt.time)}</span>
+                    </div>
+                    
+                    <div className="mt-3 p-2 bg-rose-50/50 rounded-lg border border-rose-100/40">
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-rose-600 block">Cancellation Reason</span>
+                      <p className="text-xs font-semibold text-rose-700 mt-0.5">"{appt.cancelReason || "No reason specified"}"</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      onClick={() => declineCancellationMutation.mutate(appt.id)}
+                      disabled={declineCancellationMutation.isPending}
+                      variant="outline"
+                      className="flex-1 border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs py-2 h-auto rounded-lg"
+                    >
+                      Decline Request
+                    </Button>
+                    <Button
+                      onClick={() => setDeleteConfirm(appt.id)}
+                      className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-2 h-auto rounded-lg shadow-sm"
+                    >
+                      Approve Cancellation
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
 
         {/* Patient View: Busy Slots Guide */}
         {isPatient && (
-          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3 shadow-sm">
-            <div className="flex items-center gap-2 text-slate-700">
-              <CalendarDays className="w-5 h-5 text-indigo-500" />
-              <h2 className="font-bold text-base font-display">Doctor Availability (Conflicting Busy Hours)</h2>
-            </div>
-            <p className="text-xs text-slate-500">
-              To guarantee your appointment is approved immediately, please choose a slot that **does not** overlap with any of the following confirmed bookings:
-            </p>
-            {appointments.filter(a => a.status === "Scheduled" || a.status === "Ongoing").length === 0 ? (
-              <p className="text-xs text-emerald-600 font-medium">All times and days are completely open! Feel free to book any slot.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {appointments
-                  .filter(a => a.status === "Scheduled" || a.status === "Ongoing")
-                  .map((a, i) => (
-                    <Badge key={i} className="bg-indigo-50 text-indigo-700 border border-indigo-100 font-semibold text-xs px-2.5 py-1">
-                      {a.date} @ {formatTime12Hour(a.time)} ({a.therapy})
-                    </Badge>
-                  ))}
+          <div className="premium-card p-8 bg-slate-900 text-white relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/20 blur-2xl rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+            <div className="relative z-10 space-y-4">
+              <div className="flex items-center gap-2.5 text-indigo-300">
+                <CalendarDays className="w-5.5 h-5.5 text-indigo-400" />
+                <h2 className="font-black text-lg tracking-tight">Practitioner Availability Guide</h2>
               </div>
-            )}
+              <p className="text-xs text-slate-400 font-bold leading-relaxed">
+                To guarantee your appointment is approved immediately, please choose a slot that does not overlap with any of the confirmed clinical bookings:
+              </p>
+              {appointments.filter(a => a.status === "Scheduled" || a.status === "Ongoing").length === 0 ? (
+                <p className="text-xs text-emerald-400 font-bold">All times and days are completely open! Feel free to book any slot.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {appointments
+                    .filter(a => a.status === "Scheduled" || a.status === "Ongoing")
+                    .map((a, i) => (
+                      <Badge key={i} className="bg-white/10 hover:bg-white/15 text-indigo-200 border border-white/10 font-bold text-xs px-3 py-1 rounded-xl">
+                        {a.date} @ {formatTime12Hour(a.time)} ({a.therapy})
+                      </Badge>
+                    ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -452,26 +597,91 @@ export default function AppointmentsPage() {
                 const Icon = STATUS_ICONS[appt.status];
 
                 return (
-                  <div key={appt.id} className="p-4 border rounded-2xl flex flex-col sm:flex-row justify-between gap-4 sm:gap-0 bg-card hover:shadow-md transition-all duration-200">
+                  <div key={appt.id} className="glass-card-hover p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white">
                     <div>
-                      <p className="font-bold text-slate-900">{appt.patient}</p>
-                      <p className="text-sm text-slate-500">{appt.therapy}</p>
-                      <p className="text-xs text-muted-foreground mt-1.5 sm:hidden flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <p className="font-black text-slate-900 text-lg leading-tight">{appt.patient}</p>
+                      <p className="text-xs text-slate-500 font-bold mt-1">{appt.therapy}</p>
+                      <p className="text-xs text-slate-400 font-semibold mt-2 sm:hidden flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-slate-400" />
                         {formatTime12Hour(appt.time)}
                       </p>
+                      {appt.status === "Cancel Requested" && (
+                        <div className="mt-3 p-3 bg-rose-50/50 rounded-xl border border-rose-100/40 max-w-md">
+                          <span className="text-[9px] uppercase tracking-wider font-black text-rose-600 block">Cancellation Reason</span>
+                          <p className="text-xs font-semibold text-rose-700 mt-1">"{appt.cancelReason || "No reason specified"}"</p>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-4">
-                      <p className="text-sm text-slate-600 font-medium hidden sm:block mr-2">{formatTime12Hour(appt.time)}</p>
-                      <Badge className={STATUS_COLORS[appt.status]}>
+                    <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0">
+                      <p className="text-sm text-slate-600 font-bold hidden sm:block mr-2">{formatTime12Hour(appt.time)}</p>
+                      <Badge className={`${STATUS_COLORS[appt.status]} text-[10px] font-black uppercase tracking-wider px-2.5 py-1`}>
                         {createElement(Icon, { className: "w-3 h-3 mr-1" })}
                         {appt.status}
                       </Badge>
 
-                      <button onClick={() => setDeleteConfirm(appt.id)} className="p-2 hover:bg-rose-50 rounded-xl transition-colors">
-                        <Trash2 className="w-4 h-4 text-rose-500" />
-                      </button>
+                      {isPatient ? (
+                        // Patient action: Request Cancellation if not already done or completed
+                        appt.status !== "Cancel Requested" && appt.status !== "Completed" && (
+                          <button
+                            onClick={() => {
+                              setApptToCancel(appt.id);
+                              setCancelDialogOpen(true);
+                            }}
+                            className="p-2.5 hover:bg-rose-50 hover:text-rose-600 rounded-xl transition-all text-slate-400 shadow-sm border border-slate-100"
+                            title="Request Cancellation"
+                          >
+                            <Trash2 className="w-4.5 h-4.5 text-rose-500" />
+                          </button>
+                        )
+                      ) : (
+                        // Doctor action: Decline or Approve cancellation if status is Cancel Requested, Approve if status is Pending, otherwise standard Trash delete
+                        appt.status === "Cancel Requested" ? (
+                          <div className="flex gap-2 ml-2">
+                            <Button
+                              onClick={() => declineCancellationMutation.mutate(appt.id)}
+                              disabled={declineCancellationMutation.isPending}
+                              variant="outline"
+                              className="h-9 px-3 text-xs font-bold border-slate-200 hover:bg-slate-50"
+                            >
+                              Decline
+                            </Button>
+                            <Button
+                              onClick={() => setDeleteConfirm(appt.id)}
+                              className="h-9 px-3 text-xs bg-rose-600 hover:bg-rose-700 text-white font-black"
+                            >
+                              Approve
+                            </Button>
+                          </div>
+                        ) : appt.status === "Pending" ? (
+                          <div className="flex gap-2 ml-2 items-center">
+                            <Button
+                              onClick={() => {
+                                setApprovalDialog(appt);
+                                setApprovalForm({ date: appt.date, time: appt.time });
+                              }}
+                              className="h-9 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white font-black"
+                            >
+                              Approve
+                            </Button>
+                            <button
+                              onClick={() => setDeleteConfirm(appt.id)}
+                              className="p-2.5 hover:bg-rose-50 rounded-xl transition-all text-slate-400 shadow-sm border border-slate-100"
+                              title="Delete Appointment"
+                            >
+                              <Trash2 className="w-4.5 h-4.5 text-rose-500" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setDeleteConfirm(appt.id)}
+                            className="p-2.5 hover:bg-rose-50 rounded-xl transition-all text-slate-400 shadow-sm border border-slate-100"
+                            title="Delete Appointment"
+                          >
+                            <Trash2 className="w-4.5 h-4.5 text-rose-500" />
+                          </button>
+                        )
+                      )}
                     </div>
                   </div>
                 );
@@ -481,15 +691,63 @@ export default function AppointmentsPage() {
           ))
         )}
 
+        {/* Cancellation Request Modal */}
+        {cancelDialogOpen && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="p-8 bg-white border border-slate-100 rounded-[2rem] shadow-premium max-w-md w-full space-y-6 relative overflow-hidden">
+              <div className="flex items-center gap-3 text-rose-600">
+                <AlertTriangle className="w-6 h-6 animate-pulse" />
+                <h2 className="font-black text-xl font-heading text-slate-900 tracking-tight">Cancel Appointment</h2>
+              </div>
+              <p className="text-sm text-slate-500 font-semibold leading-relaxed">
+                To request cancellation, please specify a valid reason. Your practitioner will review and confirm this request.
+              </p>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-widest font-black text-slate-400">Reason for Cancellation *</label>
+                  <Textarea
+                    placeholder="E.g., Medical emergency, sudden conflict in travel schedule, etc..."
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    className="min-h-[100px] bg-slate-50 border-slate-100 rounded-xl resize-none p-3 text-sm font-semibold placeholder:text-slate-300 focus:bg-white focus-visible:ring-blue-100"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setCancelDialogOpen(false)}
+                  className="flex-1 border-slate-200 font-bold rounded-xl h-11 text-xs"
+                >
+                  Keep Appointment
+                </Button>
+                <Button
+                  onClick={handleRequestCancelSubmit}
+                  disabled={cancelRequestMutation.isPending}
+                  className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl h-11 text-xs shadow-md shadow-rose-100"
+                >
+                  {cancelRequestMutation.isPending ? "Submitting..." : "Submit Request"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Delete Modal */}
         {deleteConfirm && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-card border border-border p-6 rounded-2xl max-w-sm w-full shadow-2xl space-y-4 bg-white">
-              <p className="font-bold text-slate-900 text-lg">Delete this appointment?</p>
-              <p className="text-slate-500 text-sm">This action will cancel the treatment schedule and remove all related notification reminders.</p>
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="p-8 bg-white border border-slate-100 rounded-[2rem] shadow-premium max-w-sm w-full space-y-5 relative overflow-hidden">
+              <div className="flex items-center gap-3 text-rose-600 mb-2">
+                <AlertTriangle className="w-6 h-6 shrink-0" />
+                <p className="font-black text-slate-900 text-lg tracking-tight">Delete Appointment?</p>
+              </div>
+              <p className="text-slate-500 text-sm font-semibold leading-relaxed">This action will cancel the treatment schedule and remove all related notification reminders.</p>
               <div className="flex gap-3 pt-2">
-                <Button variant="outline" className="flex-1" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
-                <Button variant="destructive" className="flex-1" onClick={() => handleDelete(deleteConfirm)}>Yes, Delete</Button>
+                <Button variant="outline" className="flex-1 border-slate-200 font-bold rounded-xl h-11 text-xs" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+                <Button variant="destructive" className="flex-1 font-black rounded-xl h-11 text-xs shadow-md shadow-red-100" onClick={() => handleDelete(deleteConfirm)}>Yes, Delete</Button>
               </div>
             </div>
           </div>
@@ -497,47 +755,49 @@ export default function AppointmentsPage() {
 
         {/* Doctor Approval / Reschedule Modal */}
         {approvalDialog && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-card border border-border p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4 bg-white">
-              <div className="flex items-center gap-2 text-amber-600">
-                <CalendarDays className="w-6 h-6" />
-                <h2 className="font-bold text-lg font-display">Approve & Confirm Booking</h2>
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="p-8 bg-white border border-slate-100 rounded-[2rem] shadow-premium max-w-md w-full space-y-6 relative overflow-hidden">
+              <div className="flex items-center gap-3 text-amber-600">
+                <CalendarDays className="w-6 h-6 text-amber-500 animate-pulse" />
+                <h2 className="font-black text-xl font-heading text-slate-900 tracking-tight">Approve Booking</h2>
               </div>
-              <p className="text-sm text-slate-500">
-                Review and finalize the appointment schedule for <strong className="text-slate-800">{approvalDialog.patient}</strong> (Therapy: {approvalDialog.therapy}).
+              <p className="text-sm text-slate-500 font-semibold leading-relaxed">
+                Review and finalize the appointment schedule for <strong className="text-slate-800 font-black">{approvalDialog.patient}</strong> (Therapy: {approvalDialog.therapy}).
               </p>
 
-              <div className="space-y-3 pt-2">
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Confirm Date</label>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-widest font-black text-slate-400">Confirm Date</label>
                   <Input
                     type="date"
                     value={approvalForm.date}
                     onChange={(e) => setApprovalForm({ ...approvalForm, date: e.target.value })}
+                    className="bg-slate-50 border-slate-100 rounded-xl"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Confirm Time</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-widest font-black text-slate-400">Confirm Time</label>
                   <Input
                     type="time"
                     value={approvalForm.time}
                     onChange={(e) => setApprovalForm({ ...approvalForm, time: e.target.value })}
+                    className="bg-slate-50 border-slate-100 rounded-xl"
                   />
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-2">
                 <Button
                   variant="outline"
                   onClick={() => setApprovalDialog(null)}
-                  className="flex-1 border-slate-200"
+                  className="flex-1 border-slate-200 font-bold rounded-xl h-11 text-xs"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleApprove}
                   disabled={updateMutation.isPending}
-                  className="flex-1 gradient-sage text-white font-semibold"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl h-11 text-xs shadow-md shadow-blue-100"
                 >
                   {updateMutation.isPending ? "Confirming..." : "Approve Schedule"}
                 </Button>

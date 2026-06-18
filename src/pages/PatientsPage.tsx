@@ -221,34 +221,18 @@ export default function PatientsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-foreground text-sm font-semibold">Gender</Label>
-                    <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
-                      <SelectTrigger className="mt-1.5">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Male">Male</SelectItem>
-                        <SelectItem value="Female">Female</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-foreground text-sm font-semibold">Dosha Type</Label>
-                    <Select value={form.dosha} onValueChange={(v) => setForm({ ...form, dosha: v as Patient["dosha"] })}>
-                      <SelectTrigger className="mt-1.5">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Vata">Vata</SelectItem>
-                        <SelectItem value="Pitta">Pitta</SelectItem>
-                        <SelectItem value="Kapha">Kapha</SelectItem>
-                        <SelectItem value="Tridosha">Tridosha</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div>
+                  <Label className="text-foreground text-sm font-semibold">Gender</Label>
+                  <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
+                    <SelectTrigger className="mt-1.5">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Male">Male</SelectItem>
+                      <SelectItem value="Female">Female</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -315,20 +299,25 @@ export default function PatientsPage() {
           variants={containerVariants}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-6"
         >
           {stats.map((stat, i) => (
             <motion.div
               key={i}
               variants={itemVariants}
               whileHover={{ y: -5 }}
-              className={`${stat.color} rounded-lg p-4 sm:p-5`}
+              className="premium-card p-6 flex flex-col justify-between h-36 relative group"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <stat.icon className="w-4 h-4 sm:w-5 sm:h-5" />
+              <div className="flex items-center justify-between">
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${stat.color} shadow-sm`}>
+                  <stat.icon className="w-5 h-5" />
+                </div>
+                <Badge className="bg-slate-50 text-slate-400 border border-slate-100/80 text-[8px] uppercase tracking-widest font-black">Verified</Badge>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold">{stat.value}</p>
-              <p className="text-xs sm:text-sm opacity-75 font-medium">{stat.label}</p>
+              <div className="mt-4">
+                <p className="text-3xl font-black text-slate-900 leading-none mb-1">{stat.value}</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
+              </div>
             </motion.div>
           ))}
         </motion.div>
@@ -398,14 +387,13 @@ export default function PatientsPage() {
                 key={p.id}
                 variants={itemVariants}
                 exit={{ opacity: 0, x: -20 }}
-                whileHover={{ scale: 1.02 }}
-                className="glass-card-hover p-3 sm:p-4 hover:shadow-lg transition-all duration-300 group border-l-4 border-l-primary/20"
+                className="glass-card-hover p-5 hover:shadow-md transition-all duration-300 group border-l-4 border-l-blue-600/30 bg-white"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                   {/* Avatar */}
                   <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    className="w-10 h-10 rounded-full gradient-sage flex items-center justify-center text-primary-foreground font-semibold text-sm flex-shrink-0"
+                    whileHover={{ scale: 1.05 }}
+                    className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-base flex-shrink-0 shadow-md shadow-blue-100"
                   >
                     {p.name
                       .split(" ")
@@ -415,29 +403,29 @@ export default function PatientsPage() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <p className="font-semibold text-foreground text-sm sm:text-base">{p.name}</p>
-                      <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 flex-shrink-0 ${doshaColor[p.dosha]}`}>
+                    <div className="flex items-center gap-2.5 flex-wrap mb-1.5">
+                      <p className="font-black text-slate-900 text-base sm:text-lg tracking-tight leading-none">{p.name}</p>
+                      <Badge className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 border ${doshaColor[p.dosha]}`}>
                         {p.dosha}
                       </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground flex flex-wrap gap-2">
-                      <span>{p.age}y</span>
-                      <span>•</span>
+                    <p className="text-xs text-slate-500 font-bold flex flex-wrap gap-2.5 items-center">
+                      <span>Age: {p.age}</span>
+                      <span className="w-1 h-1 bg-slate-300 rounded-full" />
                       <span>{p.gender}</span>
-                      <span>•</span>
-                      <span>{p.phone}</span>
+                      <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                      <span className="text-slate-400 font-semibold">{p.phone}</span>
                     </p>
                   </div>
 
                   {/* Status and Actions - Desktop */}
-                  <div className="hidden sm:flex items-center gap-3">
-                    <div className="flex flex-col items-end gap-1">
-                      <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 ${statusColor[p.status]}`}>
+                  <div className="hidden sm:flex items-center gap-4">
+                    <div className="flex flex-col items-end gap-1.5">
+                      <Badge className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 ${statusColor[p.status]}`}>
                         {p.status}
                       </Badge>
-                      <span className="text-[10px] text-muted-foreground">
-                        Last: {p.lastVisit ? new Date(p.lastVisit).toLocaleDateString() : "N/A"}
+                      <span className="text-[10px] text-slate-400 font-bold">
+                        Last Visit: {p.lastVisit ? new Date(p.lastVisit).toLocaleDateString() : "N/A"}
                       </span>
                     </div>
 
@@ -446,26 +434,26 @@ export default function PatientsPage() {
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setSelectedPatient(p)}
-                        className="p-2 rounded-lg hover:bg-blue-100 text-blue-600 opacity-0 group-hover:opacity-100 transition-all"
+                        className="p-2.5 rounded-xl hover:bg-blue-50 text-blue-600 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
                         title="View details"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-4.5 h-4.5" />
                       </motion.button>
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setDeleteConfirm(p.id)}
-                        className="p-2 rounded-lg hover:bg-red-100 text-red-600 opacity-0 group-hover:opacity-100 transition-all"
+                        className="p-2.5 rounded-xl hover:bg-rose-50 text-rose-600 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
                         title="Delete patient"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-4.5 h-4.5" />
                       </motion.button>
                     </div>
                   </div>
 
                   {/* Status - Mobile */}
                   <div className="sm:hidden">
-                    <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 ${statusColor[p.status]}`}>
+                    <Badge className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 ${statusColor[p.status]}`}>
                       {p.status}
                     </Badge>
                   </div>
@@ -477,17 +465,17 @@ export default function PatientsPage() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setSelectedPatient(p)}
-                    className="flex-1 flex items-center justify-center gap-1 p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors text-xs"
+                    className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors text-xs font-bold"
                   >
-                    <Eye className="w-3 h-3" /> View
+                    <Eye className="w-3.5 h-3.5" /> View Details
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setDeleteConfirm(p.id)}
-                    className="flex-1 flex items-center justify-center gap-1 p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors text-xs"
+                    className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors text-xs font-bold"
                   >
-                    <Trash2 className="w-3 h-3" /> Delete
+                    <Trash2 className="w-3.5 h-3.5" /> Delete
                   </motion.button>
                 </div>
               </motion.div>

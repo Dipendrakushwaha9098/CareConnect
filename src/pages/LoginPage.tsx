@@ -245,7 +245,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
  
-  const [role, setRole] = useState<"patient" | "doctor">("patient");
+  const [role, setRole] = useState<"patient" | "doctor" | "admin">("patient");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -262,8 +262,15 @@ export default function LoginPage() {
     }
     setIsLoading(true);
     try {
-      await requestOtp(email, role);
-      toast.success("Identity Verified", { description: "Encryption-locked OTP sent to your secure email." });
+      const data = await requestOtp(email, role);
+      const description = data.otp
+        ? `Verification code: ${data.otp} (Console auto-fill active for local dev)`
+        : "Encryption-locked OTP sent to your secure email.";
+      
+      toast.success("Identity Verified", { description });
+      if (data.otp) {
+        setOtp(data.otp);
+      }
       setStep("otp");
     } catch (err: any) {
       toast.error("Transmission Error", { description: err.message });
@@ -283,10 +290,15 @@ export default function LoginPage() {
       const data = await verifyOtp(email, otp, role, name);
       if (data.success && data.user) {
         login(data.user);
+        
+        let roleDesc = "Valued Patient";
+        if (role === "doctor") roleDesc = "Clinical Lead";
+        else if (role === "admin") roleDesc = "Medical Admin";
+
         toast.success("Security Cleared", {
-          description: `Establishing session for ${role === "doctor" ? "Clinical Lead" : "Valued Patient"}.`,
+          description: `Establishing session for ${roleDesc}.`,
         });
-        navigate(role === "doctor" ? "/dashboard" : "/patient-dashboard");
+        navigate(role === "patient" ? "/patient-dashboard" : "/dashboard");
       }
     } catch (err: any) {
       toast.error("Verification Refused", { description: err.message });
@@ -331,7 +343,7 @@ export default function LoginPage() {
  
           {step === "email" && (
             <motion.div variants={itemVariants} className="flex bg-slate-50 p-1.5 rounded-2xl mb-12 border border-slate-100 shadow-inner">
-              {(["patient", "doctor"] as const).map((r) => (
+              {(["patient", "doctor", "admin"] as const).map((r) => (
                 <button
                   key={r}
                   className={`flex-1 py-3 text-xs font-black rounded-xl transition-all uppercase tracking-widest ${
@@ -347,7 +359,7 @@ export default function LoginPage() {
  
           <motion.div variants={itemVariants} className="mb-12">
             <h1 className="font-heading text-4xl font-black text-slate-900 leading-tight mb-4 tracking-tight">
-              {role === "patient" ? "Connect with care." : "Lead your clinic."}
+              {role === "patient" ? "Connect with care." : role === "doctor" ? "Lead your clinic." : "Administer CareConnect."}
             </h1>
             <p className="text-slate-500 font-bold leading-relaxed">
               {step === "email"
@@ -372,7 +384,7 @@ export default function LoginPage() {
                     <Label className="text-slate-500 font-black uppercase tracking-widest text-[10px] pl-1">Full Name (If registering)</Label>
                     <div className="relative group">
                       <div className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center">
-                         <UserRound className="w-5 h-5 text-slate-300 group-focus-within:text-blue-600 transition-colors" />
+                         <User className="w-5 h-5 text-slate-300 group-focus-within:text-blue-600 transition-colors" />
                       </div>
                       <Input
                         type="text"
@@ -389,14 +401,15 @@ export default function LoginPage() {
                       <div className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center">
                          <Mail className="w-5 h-5 text-slate-300 group-focus-within:text-blue-600 transition-colors" />
                       </div>
-                    <Input
-                      type="email"
-                      placeholder="hello@careconnect.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-14 h-18 text-lg font-black bg-slate-50 border-slate-100 focus:bg-white focus-visible:ring-blue-100 focus-visible:border-blue-400 rounded-2xl transition-all placeholder:text-slate-300"
-                      required
-                    />
+                      <Input
+                        type="email"
+                        placeholder="hello@careconnect.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="pl-14 h-18 text-lg font-black bg-slate-50 border-slate-100 focus:bg-white focus-visible:ring-blue-100 focus-visible:border-blue-400 rounded-2xl transition-all placeholder:text-slate-300"
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
                 <Button
@@ -465,10 +478,10 @@ export default function LoginPage() {
           </AnimatePresence>
  
           <motion.div variants={itemVariants} className="mt-12 text-center">
-             <div className="inline-flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100">
-                <Sparkles className="w-4 h-4 text-blue-400" />
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Powering {role === "patient" ? "your health" : "clinical excellence"}</span>
-             </div>
+              <div className="inline-flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                 <Sparkles className="w-4 h-4 text-blue-400" />
+                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Powering {role === "patient" ? "your health" : role === "doctor" ? "clinical excellence" : "administrative control"}</span>
+              </div>
           </motion.div>
         </motion.div>
  

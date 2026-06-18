@@ -2,13 +2,31 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("Seeding Database with Realistic Medical Data...");
+  console.log("Cleaning Database and Seeding Initial Clinic Configuration...");
 
-  // Clean existing data
+  // Clean existing patient and transactional data completely
+  await prisma.invoice.deleteMany();
+  await prisma.prescription.deleteMany();
+  await prisma.notification.deleteMany();
   await prisma.appointment.deleteMany();
   await prisma.treatment.deleteMany();
   await prisma.patient.deleteMany();
+  await prisma.user.deleteMany();
 
+  console.log("Successfully removed all old transactional, patient, and doctor data.");
+
+  // Seed only the official Doctors (necessary for clinic operation and login)
+  const doctors = [
+    { email: "dr.alexander@careconnect.com", name: "Alexander", role: "doctor", phone: "+1 555-0199" },
+    { email: "dr.elena@careconnect.com", name: "Elena Rosa", role: "doctor", phone: "+1 555-0188" },
+  ];
+
+  for (const d of doctors) {
+    await prisma.user.create({ data: d });
+  }
+  console.log("Seeded Clinical Lead User accounts.");
+
+  // Seed standard medical treatment options (system configuration)
   const treatments = [
     {
       name: "Comprehensive Cardiac Audit",
@@ -51,30 +69,9 @@ async function main() {
   for (const t of treatments) {
     await prisma.treatment.create({ data: t });
   }
+  console.log("Seeded standard Treatment catalogue.");
 
-  const patients = [
-    { name: "Julian Voss", phone: "1234567890", email: "julian@example.com", age: 45, gender: "Male", bloodGroup: "O+", address: "Berlin, Germany" },
-    { name: "Elena Rosa", phone: "0987654321", email: "elena@example.com", age: 32, gender: "Female", bloodGroup: "A-", address: "Madrid, Spain" },
-    { name: "Sarah Chen", phone: "1122334455", email: "sarah@example.com", age: 28, gender: "Female", bloodGroup: "B+", address: "Toronto, Canada" }
-  ];
-
-  for (const p of patients) {
-    const { email, ...patientData } = p; // email is not on Patient model directly
-    const createdPatient = await prisma.patient.create({ data: patientData });
-    
-    // Create some appointments for each patient
-    await prisma.appointment.create({
-        data: {
-            patientId: createdPatient.id,
-            therapy: "Cardiology Consultation",
-            status: "Completed",
-            date: "2024-04-20",
-            time: "10:30 AM",
-        }
-    });
-  }
-
-  console.log("Realistic seeding complete!");
+  console.log("Clinic is now configured with zero dummy patients, dummy appointments, or dummy invoices!");
 }
 
 main()

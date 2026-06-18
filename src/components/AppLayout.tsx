@@ -37,6 +37,7 @@ const mainNavItems: NavItem[] = [
   { name: "Schedule", path: "/appointments", icon: Calendar },
   { name: "Clinical Dept", path: "/treatments", icon: Activity },
   { name: "E-Prescriptions", path: "/prescriptions", icon: FileText },
+  { name: "Advanced Tools", path: "/advanced-tools", icon: Brain },
   { name: "Emergency", path: "/support", icon: ShieldAlert },
 ];
 
@@ -45,6 +46,18 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
   const { logout, user } = useAuth();
+
+  const filteredNavItems = mainNavItems.map(item => {
+    if (item.name === "Overview" && user?.role === "patient") {
+      return { ...item, path: "/patient-dashboard" };
+    }
+    return item;
+  }).filter(item => {
+    if (user?.role === "patient") {
+      return item.path !== "/patients" && item.path !== "/advanced-tools";
+    }
+    return true;
+  });
 
   const NavLink = ({ item, isCollapsed }: { item: NavItem; isCollapsed: boolean }) => {
     const isActive = location.pathname === item.path;
@@ -77,19 +90,19 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         animate={{ width: isSidebarCollapsed ? 90 : 300 }}
         className="hidden md:flex flex-col bg-slate-900 border-r border-slate-800 relative z-30"
       >
-        <div className="p-8 flex justify-between items-center mb-6">
-          {!isSidebarCollapsed && (
-            <Link to="/" className="flex items-center gap-3">
-               <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900">
-                  <HeartPulse className="w-6 h-6 text-white" />
-               </div>
+        <div className={cn("p-8 flex items-center mb-6", isSidebarCollapsed ? "justify-center flex-col gap-4 px-4" : "justify-between")}>
+          <Link to="/" className="flex items-center gap-3">
+             <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900 shrink-0">
+                <HeartPulse className="w-6 h-6 text-white" />
+             </div>
+             {!isSidebarCollapsed && (
                <span className="font-heading text-xl font-black text-white tracking-tighter">CareConnect</span>
-            </Link>
-          )}
+             )}
+          </Link>
 
           <button 
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+            className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shrink-0"
           >
             <ChevronLeft className={cn("w-5 h-5 transition-transform", isSidebarCollapsed && "rotate-180")} />
           </button>
@@ -99,7 +112,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           <div className="mb-8 px-4">
              <p className={cn("text-[10px] font-black uppercase tracking-[0.2em] text-slate-500", isSidebarCollapsed && "hidden")}>Main Menu</p>
           </div>
-          {mainNavItems.map((item) => (
+          {filteredNavItems.map((item) => (
             <NavLink key={item.path} item={item} isCollapsed={isSidebarCollapsed} />
           ))}
           
@@ -157,7 +170,9 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             <div className="flex items-center gap-4">
                <div className="text-right hidden sm:block">
                   <p className="font-black text-slate-900 text-sm">{user?.name || "Dr. Alexander"}</p>
-                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Medical Admin</p>
+                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                    {user?.role === "doctor" ? "Doctor" : user?.role === "patient" ? "Patient" : "Medical Admin"}
+                  </p>
                </div>
                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-100 ring-4 ring-blue-50/50">
                  {user?.name?.[0] || "A"}
@@ -206,7 +221,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               </div>
 
               <div className="flex-1">
-                {mainNavItems.map((item) => (
+                {filteredNavItems.map((item) => (
                   <NavLink key={item.path} item={item} isCollapsed={false} />
                 ))}
               </div>
