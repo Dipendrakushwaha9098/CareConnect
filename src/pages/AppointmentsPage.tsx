@@ -38,11 +38,11 @@ type Appointment = {
 };
 
 const STATUS_COLORS: Record<AppointmentStatus, string> = {
-  Pending: "bg-yellow-100 text-yellow-800 border border-yellow-200",
-  Scheduled: "bg-blue-100 text-blue-800 border border-blue-200",
-  Ongoing: "bg-green-100 text-green-800 border border-green-200",
-  Completed: "bg-gray-100 text-gray-800 border border-gray-200",
-  "Cancel Requested": "bg-rose-100 text-rose-800 border border-rose-200",
+  Pending: "bg-amber-50 text-amber-700 border border-amber-200",
+  Scheduled: "bg-blue-50 text-blue-700 border border-blue-200",
+  Ongoing: "bg-teal-50 text-teal-700 border border-teal-200",
+  Completed: "bg-slate-100 text-slate-700 border border-slate-200",
+  "Cancel Requested": "bg-rose-50 text-rose-700 border border-rose-200",
 };
 
 const STATUS_ICONS: Record<AppointmentStatus, React.ElementType> = {
@@ -57,7 +57,7 @@ export default function AppointmentsPage() {
   const queryClient = useQueryClient();
   const { socket } = useSocket();
   const { user } = useAuth();
-  
+
   const isPatient = user?.role === "patient";
 
   const { data: appointments = [], isLoading } = useQuery<Appointment[]>({
@@ -74,7 +74,7 @@ export default function AppointmentsPage() {
     queryKey: ["treatments"],
     queryFn: fetchTreatments,
   });
-  
+
   const currentPatient = isPatient ? patients.find(p => p.name === user?.name || p.userId === user?.id) : null;
 
   const createMutation = useMutation({
@@ -143,7 +143,7 @@ export default function AppointmentsPage() {
   const [apptToCancel, setApptToCancel] = useState<string | null>(null);
 
   const cancelRequestMutation = useMutation({
-    mutationFn: ({ id, reason }: { id: string, reason: string }) => 
+    mutationFn: ({ id, reason }: { id: string, reason: string }) =>
       updateAppointment(id, { status: "Cancel Requested", cancelReason: reason }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
@@ -194,7 +194,7 @@ export default function AppointmentsPage() {
     const finalPatientId = isPatient
       ? (isBookingForSelf ? currentPatient?.id : undefined)
       : newForm.patientId;
-    
+
     if (!isPatient && patientType === "new") {
       if (!newForm.patientName || !newForm.date || !newForm.time || !newForm.patientAge || !newForm.patientGender) {
         toast.error("Please fill patient name, phone, age, gender, and preferred schedule.");
@@ -251,7 +251,7 @@ export default function AppointmentsPage() {
   // ✅ Filtering
   const filtered = appointments.filter((appt) => {
     if (isPatient && appt.patient !== user?.name && appt.patientId !== user?.id) return false;
-    
+
     return (
       (appt.patient.toLowerCase().includes(searchQuery.toLowerCase()) ||
         appt.therapy.toLowerCase().includes(searchQuery.toLowerCase())) &&
@@ -524,7 +524,7 @@ export default function AppointmentsPage() {
                       <Clock className="w-3.5 h-3.5" />
                       <span>{appt.date} at {formatTime12Hour(appt.time)}</span>
                     </div>
-                    
+
                     <div className="mt-3 p-2 bg-rose-50/50 rounded-lg border border-rose-100/40">
                       <span className="text-[9px] uppercase tracking-wider font-bold text-rose-600 block">Cancellation Reason</span>
                       <p className="text-xs font-semibold text-rose-700 mt-0.5">"{appt.cancelReason || "No reason specified"}"</p>
@@ -584,8 +584,20 @@ export default function AppointmentsPage() {
 
         {/* List */}
         {dates.length === 0 ? (
-          <div className="p-12 border border-dashed rounded-2xl text-center bg-card">
-            <p className="text-muted-foreground">No appointments match your criteria.</p>
+          <div className="p-12 border border-dashed border-slate-200 rounded-3xl text-center bg-white">
+            <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <h3 className="text-base font-bold text-slate-900">No appointments found</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+              {isPatient
+                ? "You have no upcoming or past appointments in this category. Click 'Add Appointment' to schedule a consultation."
+                : "No clinical appointments match your current filters. Try resetting the filters or add a new appointment."}
+            </p>
+            <Button
+              onClick={() => setDialogOpen(true)}
+              className="mt-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold h-10 px-5"
+            >
+              <Plus className="w-4 h-4 mr-1.5" /> Schedule Appointment
+            </Button>
           </div>
         ) : (
           dates.map((date) => (
@@ -593,77 +605,86 @@ export default function AppointmentsPage() {
               <h2 className="font-bold font-display text-slate-500 text-sm uppercase tracking-wider mt-4">{date}</h2>
 
               <div className="grid gap-3">
-              {grouped[date].map((appt) => {
-                const Icon = STATUS_ICONS[appt.status];
+                {grouped[date].map((appt) => {
+                  const Icon = STATUS_ICONS[appt.status];
 
-                return (
-                  <div key={appt.id} className="glass-card-hover p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white">
-                    <div>
-                      <p className="font-black text-slate-900 text-lg leading-tight">{appt.patient}</p>
-                      <p className="text-xs text-slate-500 font-bold mt-1">{appt.therapy}</p>
-                      <p className="text-xs text-slate-400 font-semibold mt-2 sm:hidden flex items-center gap-1.5">
-                        <Clock className="w-4 h-4 text-slate-400" />
-                        {formatTime12Hour(appt.time)}
-                      </p>
-                      {appt.status === "Cancel Requested" && (
-                        <div className="mt-3 p-3 bg-rose-50/50 rounded-xl border border-rose-100/40 max-w-md">
-                          <span className="text-[9px] uppercase tracking-wider font-black text-rose-600 block">Cancellation Reason</span>
-                          <p className="text-xs font-semibold text-rose-700 mt-1">"{appt.cancelReason || "No reason specified"}"</p>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0">
-                      <p className="text-sm text-slate-600 font-bold hidden sm:block mr-2">{formatTime12Hour(appt.time)}</p>
-                      <Badge className={`${STATUS_COLORS[appt.status]} text-[10px] font-black uppercase tracking-wider px-2.5 py-1`}>
-                        {createElement(Icon, { className: "w-3 h-3 mr-1" })}
-                        {appt.status}
-                      </Badge>
-
-                      {isPatient ? (
-                        // Patient action: Request Cancellation if not already done or completed
-                        appt.status !== "Cancel Requested" && appt.status !== "Completed" && (
-                          <button
-                            onClick={() => {
-                              setApptToCancel(appt.id);
-                              setCancelDialogOpen(true);
-                            }}
-                            className="p-2.5 hover:bg-rose-50 hover:text-rose-600 rounded-xl transition-all text-slate-400 shadow-sm border border-slate-100"
-                            title="Request Cancellation"
-                          >
-                            <Trash2 className="w-4.5 h-4.5 text-rose-500" />
-                          </button>
-                        )
-                      ) : (
-                        // Doctor action: Decline or Approve cancellation if status is Cancel Requested, Approve if status is Pending, otherwise standard Trash delete
-                        appt.status === "Cancel Requested" ? (
-                          <div className="flex gap-2 ml-2">
-                            <Button
-                              onClick={() => declineCancellationMutation.mutate(appt.id)}
-                              disabled={declineCancellationMutation.isPending}
-                              variant="outline"
-                              className="h-9 px-3 text-xs font-bold border-slate-200 hover:bg-slate-50"
-                            >
-                              Decline
-                            </Button>
-                            <Button
-                              onClick={() => setDeleteConfirm(appt.id)}
-                              className="h-9 px-3 text-xs bg-rose-600 hover:bg-rose-700 text-white font-black"
-                            >
-                              Approve
-                            </Button>
+                  return (
+                    <div key={appt.id} className="glass-card-hover p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white">
+                      <div>
+                        <p className="font-black text-slate-900 text-lg leading-tight">{appt.patient}</p>
+                        <p className="text-xs text-slate-500 font-bold mt-1">{appt.therapy}</p>
+                        <p className="text-xs text-slate-400 font-semibold mt-2 sm:hidden flex items-center gap-1.5">
+                          <Clock className="w-4 h-4 text-slate-400" />
+                          {formatTime12Hour(appt.time)}
+                        </p>
+                        {appt.status === "Cancel Requested" && (
+                          <div className="mt-3 p-3 bg-rose-50/50 rounded-xl border border-rose-100/40 max-w-md">
+                            <span className="text-[9px] uppercase tracking-wider font-black text-rose-600 block">Cancellation Reason</span>
+                            <p className="text-xs font-semibold text-rose-700 mt-1">"{appt.cancelReason || "No reason specified"}"</p>
                           </div>
-                        ) : appt.status === "Pending" ? (
-                          <div className="flex gap-2 ml-2 items-center">
-                            <Button
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0">
+                        <p className="text-sm text-slate-600 font-bold hidden sm:block mr-2">{formatTime12Hour(appt.time)}</p>
+                        <Badge className={`${STATUS_COLORS[appt.status]} text-[10px] font-black uppercase tracking-wider px-2.5 py-1`}>
+                          {createElement(Icon, { className: "w-3 h-3 mr-1" })}
+                          {appt.status}
+                        </Badge>
+
+                        {isPatient ? (
+                          // Patient action: Request Cancellation if not already done or completed
+                          appt.status !== "Cancel Requested" && appt.status !== "Completed" && (
+                            <button
                               onClick={() => {
-                                setApprovalDialog(appt);
-                                setApprovalForm({ date: appt.date, time: appt.time });
+                                setApptToCancel(appt.id);
+                                setCancelDialogOpen(true);
                               }}
-                              className="h-9 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white font-black"
+                              className="p-2.5 hover:bg-rose-50 hover:text-rose-600 rounded-xl transition-all text-slate-400 shadow-sm border border-slate-100"
+                              title="Request Cancellation"
                             >
-                              Approve
-                            </Button>
+                              <Trash2 className="w-4.5 h-4.5 text-rose-500" />
+                            </button>
+                          )
+                        ) : (
+                          // Doctor action: Decline or Approve cancellation if status is Cancel Requested, Approve if status is Pending, otherwise standard Trash delete
+                          appt.status === "Cancel Requested" ? (
+                            <div className="flex gap-2 ml-2">
+                              <Button
+                                onClick={() => declineCancellationMutation.mutate(appt.id)}
+                                disabled={declineCancellationMutation.isPending}
+                                variant="outline"
+                                className="h-9 px-3 text-xs font-bold border-slate-200 hover:bg-slate-50"
+                              >
+                                Decline
+                              </Button>
+                              <Button
+                                onClick={() => setDeleteConfirm(appt.id)}
+                                className="h-9 px-3 text-xs bg-rose-600 hover:bg-rose-700 text-white font-black"
+                              >
+                                Approve
+                              </Button>
+                            </div>
+                          ) : appt.status === "Pending" ? (
+                            <div className="flex gap-2 ml-2 items-center">
+                              <Button
+                                onClick={() => {
+                                  setApprovalDialog(appt);
+                                  setApprovalForm({ date: appt.date, time: appt.time });
+                                }}
+                                className="h-9 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white font-black"
+                              >
+                                Approve
+                              </Button>
+                              <button
+                                onClick={() => setDeleteConfirm(appt.id)}
+                                className="p-2.5 hover:bg-rose-50 rounded-xl transition-all text-slate-400 shadow-sm border border-slate-100"
+                                title="Delete Appointment"
+                              >
+                                <Trash2 className="w-4.5 h-4.5 text-rose-500" />
+                              </button>
+                            </div>
+                          ) : (
                             <button
                               onClick={() => setDeleteConfirm(appt.id)}
                               className="p-2.5 hover:bg-rose-50 rounded-xl transition-all text-slate-400 shadow-sm border border-slate-100"
@@ -671,21 +692,12 @@ export default function AppointmentsPage() {
                             >
                               <Trash2 className="w-4.5 h-4.5 text-rose-500" />
                             </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setDeleteConfirm(appt.id)}
-                            className="p-2.5 hover:bg-rose-50 rounded-xl transition-all text-slate-400 shadow-sm border border-slate-100"
-                            title="Delete Appointment"
-                          >
-                            <Trash2 className="w-4.5 h-4.5 text-rose-500" />
-                          </button>
-                        )
-                      )}
+                          )
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
               </div>
             </div>
           ))

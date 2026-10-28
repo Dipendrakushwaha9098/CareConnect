@@ -53,7 +53,7 @@ interface CustomWindow extends Window {
 
 export default function AdvancedUtilitiesPage() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"qr" | "voice">("qr");
+  const [activeTab, setActiveTab] = useState<"qr" | "voice" | "telemedicine">("qr");
 
   // 1. Telemedicine State
   interface TeleDoctor {

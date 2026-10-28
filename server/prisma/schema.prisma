@@ -10,80 +10,374 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ── 1. USER & AUTHENTICATION ──────────────────────────────────────────
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  phone     String?
-  name      String
-  role      String   @default("patient") // 'patient' | 'doctor'
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  patients  Patient[]
+  id                    String          @id @default(uuid())
+  email                 String          @unique
+  phone                 String?
+  name                  String
+  passwordHash          String?
+  role                  String          @default("patient") // 'patient' | 'doctor' | 'admin'
+  isEmailVerified       Boolean         @default(false)
+  status                String          @default("Active")  // 'Active' | 'Suspended'
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  doctorProfile         DoctorProfile?
+  patients              Patient[]
+  passwordResets        PasswordReset[]
+  doctorAppointments    Appointment[]   @relation("DoctorAppointments")
+  authoredMedicalRecords MedicalRecord[] @relation("DoctorMedicalRecords")
+  authoredPrescriptions Prescription[]  @relation("DoctorPrescriptions")
+  authoredConsultations ConsultationNote[] @relation("DoctorConsultationNotes")
+  doctorVerificationRequests DoctorVerificationRequest[] @relation("DoctorVerificationDoctor")
+  reviewedVerificationRequests DoctorVerificationRequest[] @relation("AdminVerifier")
+  doctorAvailabilities  DoctorAvailability[] @relation("DoctorAvailabilities")
+  notifications         Notification[]  @relation("UserNotifications")
+  auditLogs             AuditLog[]      @relation("UserAuditLogs")
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
 }
 
+// ── 2. DOCTOR PROFILES ────────────────────────────────────────────────
+model DoctorProfile {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialization       String
+  qualifications       String
+  experienceYears      Int      @default(0)
+  hospitalAffiliation  String?
+  medicalLicenseNumber String
+  verificationStatus   String   @default("PENDING") // 'PENDING' | 'VERIFIED' | 'REJECTED'
+  rejectionReason      String?
+  consultationFee      Float    @default(500)
+  photoUrl             String?
+  bio                  String?
+  clinicAddress        String?
+  consultationModes    String?  @default("In-Person,Video Call")
+  workingDays          String?  @default("Monday,Tuesday,Wednesday,Thursday,Friday")
+  startTime            String?  @default("09:00 AM")
+  endTime              String?  @default("05:00 PM")
+  slotDurationMinutes  Int      @default(30)
+  breakStartTime       String?  @default("01:00 PM")
+  breakEndTime         String?  @default("02:00 PM")
+  unavailableDates     String?  @default("[]") // JSON string array of YYYY-MM-DD
+  leaveStartDate       String?
+  leaveEndDate         String?
+  maxDailyAppointments Int      @default(20)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  verificationRequests DoctorVerificationRequest[]
+  availabilities       DoctorAvailability[]
+
+  @@index([userId])
+  @@index([verificationStatus])
+  @@index([specialization])
+  @@index([medicalLicenseNumber])
+}
+
+// ── 3. DOCTOR VERIFICATION REQUESTS ───────────────────────────────────
+model DoctorVerificationRequest {
+  id              String         @id @default(uuid())
+  doctorId        String
+  doctorProfileId String
+  licenseNumber   String
+  documentUrls    String?        // JSON string array of license certificates / credentials
+  status          String         @default("PENDING") // 'PENDING' | 'APPROVED' | 'REJECTED'
+  reviewerId      String?
+  reviewNotes     String?
+  reviewedAt      DateTime?
+  submittedAt     DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  doctor          User           @relation("DoctorVerificationDoctor", fields: [doctorId], references: [id], onDelete: Cascade)
+  doctorProfile   DoctorProfile  @relation(fields: [doctorProfileId], references: [id], onDelete: Cascade)
+  reviewer        User?          @relation("AdminVerifier", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([doctorId])
+  @@index([doctorProfileId])
+  @@index([status])
+  @@index([reviewerId])
+}
+
+// ── 4. DOCTOR AVAILABILITY CONFIGURATION & SLOTS ──────────────────────
+model DoctorAvailability {
+  id                  String         @id @default(uuid())
+  doctorId            String
+  doctorProfileId     String?
+  dayOfWeek           String         // 'Monday', 'Tuesday', ...
+  startTime           String         // '09:00 AM'
+  endTime             String         // '05:00 PM'
+  slotDurationMinutes Int            @default(30)
+  isWorkingDay        Boolean        @default(true)
+  breakStartTime      String?        // '01:00 PM'
+  breakEndTime        String?        // '02:00 PM'
+  effectiveStartDate  String?        // Optional date range
+  effectiveEndDate    String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  doctor              User           @relation("DoctorAvailabilities", fields: [doctorId], references: [id], onDelete: Cascade)
+  doctorProfile       DoctorProfile? @relation(fields: [doctorProfileId], references: [id], onDelete: SetNull)
+
+  @@index([doctorId])
+  @@index([dayOfWeek])
+  @@index([isWorkingDay])
+}
+
+// ── 5. PATIENT PROFILES ───────────────────────────────────────────────
 model Patient {
-  id             String        @id @default(uuid())
-  userId         String?
-  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
-  name           String
-  age            Int
-  gender         String
-  dosha          String?
-  email          String?
-  phone          String?
-  bloodGroup     String?
-  address        String?
-  medicalHistory String?
-  lastVisit      DateTime      @default(now())
-  status         String        @default("Active")
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  appointments   Appointment[]
+  id               String             @id @default(uuid())
+  userId           String?
+  user             User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name             String
+  age              Int
+  gender           String
+  dosha            String?
+  email            String?
+  phone            String?
+  bloodGroup       String?
+  address          String?
+  emergencyContact String?
+  allergies        String?
+  medicalHistory   String?
+  lastVisit        DateTime           @default(now())
+  status           String             @default("Active")
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  appointments     Appointment[]
+  medicalRecords   MedicalRecord[]
+  consultationNotes ConsultationNote[]
+  prescriptions    Prescription[]
+
+  @@index([userId])
+  @@index([email])
+  @@index([phone])
+  @@index([name])
 }
 
+// ── 6. APPOINTMENTS ───────────────────────────────────────────────────
 model Appointment {
-  id           String   @id @default(uuid())
-  patientId    String
-  therapy      String
-  date         String // Format YYYY-MM-DD
-  time         String // Format HH:MM AM/PM
-  notes        String?
-  status       String   @default("Scheduled")
-  cancelReason String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  id                 String             @id @default(uuid())
+  patientId          String
+  doctorId           String?
+  date               String             // Format YYYY-MM-DD (appointment_date)
+  appointmentDate    String?            // Explicit appointment_date alias
+  time               String             // Format HH:MM AM/PM (start_time)
+  startTime          String?            // Explicit start_time alias
+  endTime            String?            // Explicit end_time
+  consultationType   String?            @default("In-Person") // consultation_type
+  therapy            String             @default("General Clinical Consultation") // legacy therapy / reason_for_visit
+  reasonForVisit     String?            // Explicit reason_for_visit
+  notes              String?
+  status             String             @default("Pending") // 'Pending' | 'Confirmed' | 'Rejected' | 'Cancelled' | 'Completed' | 'Reschedule Requested'
+  cancelReason       String?            // cancellation_reason
+  cancellationReason String?            // Explicit cancellation_reason alias
+  suggestedDate      String?            // For rescheduling
+  suggestedTime      String?            // For rescheduling
+  rescheduleReason   String?            // Reason for rescheduling
+  rescheduledBy      String?            // 'patient' | 'doctor'
+  completedAt        DateTime?
+  amount             Float              @default(0)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  patient            Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor             User?              @relation("DoctorAppointments", fields: [doctorId], references: [id], onDelete: SetNull)
+  medicalRecords     MedicalRecord[]
+  consultationNotes  ConsultationNote[]
+  prescriptions      Prescription[]
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([date])
+  @@index([status])
 }
 
+// ── 7. MEDICAL RECORDS ────────────────────────────────────────────────
+model MedicalRecord {
+  id             String         @id @default(uuid())
+  patientId      String
+  doctorId       String?
+  appointmentId  String?
+  recordType     String         // 'Diagnosis' | 'Lab Report' | 'Clinical Note' | 'Discharge Summary'
+  title          String
+  description    String
+  chiefComplaint String?
+  observations   String?
+  diagnosis      String?
+  treatmentPlan  String?
+  followUpDate   String?
+  status         String         @default("Finalized") // 'Draft' | 'Finalized'
+  updatedBy      String?
+  attachments    String?        // JSON array string of private file metadata
+  recordDate     String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  patient        Patient        @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor         User?          @relation("DoctorMedicalRecords", fields: [doctorId], references: [id], onDelete: SetNull)
+  appointment    Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([appointmentId])
+  @@index([recordDate])
+  @@index([recordType])
+}
+
+// ── 8. CLINICAL CONSULTATION NOTES ───────────────────────────────────
+model ConsultationNote {
+  id                     String      @id @default(uuid())
+  appointmentId          String
+  patientId              String
+  doctorId               String
+  chiefComplaint         String
+  clinicalObservations   String?
+  diagnosis              String
+  treatmentPlan          String
+  followUpDate           String?
+  followUpRecommendations String?
+  doctorNotes            String?
+  status                 String      @default("Finalized") // 'Draft' | 'Finalized'
+  finalizedAt            DateTime?
+  createdBy              String?
+  updatedBy              String?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+
+  appointment            Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  patient                Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor                 User        @relation("DoctorConsultationNotes", fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([appointmentId])
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([status])
+}
+
+// ── 9. PRESCRIPTIONS ──────────────────────────────────────────────────
+model Prescription {
+  id                      String       @id @default(uuid())
+  patientId               String?
+  doctorId                String?
+  appointmentId           String?
+  patient                 String       // Patient display name
+  doctor                  String       // Doctor display name
+  date                    String
+  medicines               String       // JSON array as string: [{ name, dosage, route, frequency, duration, instructions }]
+  followUpRecommendations String?
+  notes                   String?
+  isFinalized             Boolean      @default(false)
+  signedAt                DateTime?
+  auditLog                String?      // JSON string array of audit events
+  status                  String       @default("Active") // 'Draft' | 'Active' | 'Discontinued'
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+
+  patientRel              Patient?     @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  doctorRel               User?        @relation("DoctorPrescriptions", fields: [doctorId], references: [id], onDelete: SetNull)
+  appointmentRel          Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([appointmentId])
+  @@index([date])
+  @@index([isFinalized])
+}
+
+// ── 10. NOTIFICATIONS ─────────────────────────────────────────────────
 model Notification {
   id        String   @id @default(uuid())
+  userId    String?
   title     String
   message   String
-  type      String   @default("info")
+  type      String   @default("info") // 'info' | 'success' | 'warning' | 'error'
+  category  String   @default("general") // 'appointment' | 'prescription' | 'account' | 'general'
   read      Boolean  @default(false)
+  link      String?  // Optional navigation URL
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  user      User?    @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+  @@index([category])
+  @@index([createdAt])
+}
+
+// ── 11. AUDIT LOGS ────────────────────────────────────────────────────
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String   // 'LOGIN' | 'APPROVE_DOCTOR' | 'CREATE_APPOINTMENT' | 'CANCEL_APPOINTMENT' | 'ISSUE_PRESCRIPTION' | 'VIEW_PATIENT_FILE' | 'DOWNLOAD_RECORD'
+  entity    String   // 'User' | 'DoctorProfile' | 'Appointment' | 'MedicalRecord' | 'Prescription' | 'DoctorVerificationRequest'
+  entityId  String?
+  ipAddress String?
+  userAgent String?
+  details   String?  // JSON string containing payload or operation details
+  severity  String   @default("INFO") // 'INFO' | 'WARN' | 'CRITICAL'
+  createdAt DateTime @default(now())
+
+  user      User?    @relation("UserAuditLogs", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([entityId])
+  @@index([createdAt])
+}
+
+// ── 12. TRANSACTIONAL EMAIL AUDIT & DELIVERY LOGS ─────────────────────
+model EmailLog {
+  id              String   @id @default(uuid())
+  recipient       String
+  template        String   // 'APPOINTMENT_REQUESTED' | 'APPOINTMENT_CONFIRMED' | 'APPOINTMENT_REJECTED' | 'APPOINTMENT_CANCELLED' | 'APPOINTMENT_RESCHEDULED' | 'PRESCRIPTION_ISSUED' | 'ACCOUNT_UPDATE' | 'REMINDER'
+  idempotencyKey  String?  @unique
+  subject         String
+  deliveryStatus  String   @default("SENT") // 'SENT' | 'FAILED'
+  attempts        Int      @default(1)
+  error           String?
+  metadata        String?  // JSON string
+  sentAt          DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([recipient])
+  @@index([template])
+  @@index([deliveryStatus])
+  @@index([idempotencyKey])
+}
+
+// ── AUXILIARY SYSTEM MODELS ───────────────────────────────────────────
+model PasswordReset {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
 }
 
 model Treatment {
   id        String   @id @default(uuid())
   name      String
-  category  String?  // E.g., 'Ayurveda', 'General Medicine', 'Physiotherapy'
+  category  String?
   desc      String
   duration  String
-  type      String?  // Replaces specific 'dosha' text to be more broad
+  type      String?
   sessions  Int      @default(1)
   completed Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Prescription {
-  id        String   @id @default(uuid())
-  patient   String
-  doctor    String
-  date      String
-  medicines String   // JSON array as string
-  status    String   @default("Active")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -102,8 +396,8 @@ model MedicineReminder {
   id        String   @id @default(uuid())
   patientId String?
   name      String
-  time      String   // E.g. "08:00 AM"
-  freq      String   // E.g. "Once daily"
+  time      String
+  freq      String
   status    String   @default("Active")
   createdAt DateTime @default(now())
 }
@@ -128,6 +422,7 @@ model TelemedicineSession {
 
 model VoiceConsultationNote {
   id          String   @id @default(uuid())
+  doctorId    String?
   patientName String
   notes       String
   createdAt   DateTime @default(now())

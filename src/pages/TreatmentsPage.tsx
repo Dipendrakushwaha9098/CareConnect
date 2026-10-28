@@ -81,7 +81,7 @@ export default function TreatmentsPage() {
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto flex gradient-sage text-primary-foreground border-0 btn-ripple">
+              <Button className="w-full sm:w-auto flex bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold h-10 px-4">
                 <Plus className="w-4 h-4 mr-2" /> Add Service
               </Button>
             </DialogTrigger>
@@ -186,8 +186,8 @@ export default function TreatmentsPage() {
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl gradient-sage flex items-center justify-center">
-                      <Stethoscope className="w-5 h-5 text-primary-foreground" />
+                    <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                      <Stethoscope className="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
                       <h3 className="font-display text-lg font-semibold text-foreground">{t.name}</h3>

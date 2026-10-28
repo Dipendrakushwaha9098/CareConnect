@@ -1,17 +1,25 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { fetchCurrentUser } from "@/lib/api";
 
-interface User {
+export interface User {
   id: string;
   name: string;
   email: string;
   phone?: string;
-  role: "admin" | "doctor" | "therapist" | "patient";
+  role: "admin" | "doctor" | "patient";
+  verificationStatus?: "PENDING" | "VERIFIED" | "REJECTED";
+  isEmailVerified?: boolean;
+  status?: "Active" | "Suspended";
+  token?: string;
+  doctorProfile?: any;
+  patientId?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   login: (userData: User) => void;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
@@ -22,33 +30,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    // Check local storage for existing session
-    const storedUser = localStorage.getItem("careConnect_user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error("Failed to parse user session");
-      }
-    }
-    setIsLoading(false);
+  const logout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem("careConnect_user");
   }, []);
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const stored = localStorage.getItem("careConnect_user");
+      if (!stored) {
+        setIsLoading(false);
+        return;
+      }
+
+      const parsed: User = JSON.parse(stored);
+      if (!parsed.token) {
+        logout();
+        setIsLoading(false);
+        return;
+      }
+
+      const res = await fetchCurrentUser();
+      if (res && res.success && res.user) {
+        const updatedUser: User = {
+          ...res.user,
+          token: parsed.token,
+        };
+        setUser(updatedUser);
+        localStorage.setItem("careConnect_user", JSON.stringify(updatedUser));
+      } else {
+        logout();
+      }
+    } catch (err) {
+      console.warn("Session re-verification failed; logging out:", err);
+      logout();
+    } finally {
+      setIsLoading(false);
+    }
+  }, [logout]);
+
+  useEffect(() => {
+    refreshUser();
+  }, [refreshUser]);
 
   const login = (userData: User) => {
     setUser(userData);
     localStorage.setItem("careConnect_user", JSON.stringify(userData));
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("careConnect_user");
-  };
-
   const value = {
     user,
     login,
     logout,
+    refreshUser,
     isAuthenticated: !!user,
     isLoading,
   };
